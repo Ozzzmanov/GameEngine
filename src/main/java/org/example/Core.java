@@ -1,5 +1,8 @@
 package org.example;
 
+import org.example.Editor.Editor;
+import org.example.Editor.TransformTool;
+import org.example.GUI.GUI;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFWErrorCallback;
@@ -7,36 +10,67 @@ import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 
-import java.nio.FloatBuffer;
+import java.io.IOException;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
+
 
 public class Core {
     private long window;
     private int WIDTH = 1280;
     private int HEIGHT = 720;
 
-    private List<Mesh> meshes = new ArrayList<>();
-    private Grid grid;
-    private Camera camera;
-    private InputManager InputManager;
     private Viewport viewport;
+    private List<Mesh> meshes = new ArrayList<>();
+
+    // Shader program для основного рендеринга
+    private int mainShaderProgram;
+    private int lightShaderProgram;
+    private Camera camera;
+    private InputManager inputManager;
+    private Node node;
+
+    private Grid grid;
+
     private Editor editor;
-    private Node rootNode;
+
+    private TransformTool transformTool;
+    private GUI gui;
+
 
     private void run() {
         init();
         loop();
 
-        // Очистка памяти
-        rootNode.cleanup();
+        for (Mesh mesh : meshes) {
+            mesh.cleanup();
+        }
+
+        // Удаляем шейдерные программы
+        glDeleteProgram(mainShaderProgram);
+        glDeleteProgram(lightShaderProgram);
+        meshes.clear();
+
+        if (node != null) {
+            node.cleanup();
+        }
+        if(grid != null){
+            grid.cleanup();
+        }
+        if(editor != null){
+            editor.cleanup();
+        }
+        if(transformTool != null){
+            transformTool.cleanup();
+        }
+
 
         glfwFreeCallbacks(window);
         glfwDestroyWindow(window);
@@ -47,23 +81,30 @@ public class Core {
     private void init() {
         GLFWErrorCallback.createPrint(System.err).set();
         if (!glfwInit())
-            throw new IllegalStateException("Помилка ініціалізації GLFW");
+            throw new IllegalStateException("Ошибка инициализации GLFW");
 
+        // Настройка GLFW для OpenGL 3.3
         glfwDefaultWindowHints();
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "Рендеринг Mesh", NULL, NULL);
+        // Создание окна
+        window = glfwCreateWindow(WIDTH, HEIGHT, "3D Рендеринг с шейдерами", NULL, NULL);
         if (window == NULL)
-            throw new RuntimeException("Помилка створення вікна GLFW");
-        // Init Viewport
+            throw new RuntimeException("Ошибка создания окна GLFW");
+
+        // Инициализация Viewport
         viewport = new Viewport(WIDTH, HEIGHT);
 
-        // Встановлюємо callback для зміни розміру вікна
+        // Устанавливаем callback для изменения размера окна
         glfwSetFramebufferSizeCallback(window, (window, width, height) -> {
             WIDTH = width;
             HEIGHT = height;
             viewport.resize(width, height);
+            editor.resizePickingFBO(width, height); // Редактор
         });
 
         try (MemoryStack stack = stackPush()) {
@@ -77,70 +118,124 @@ public class Core {
                     (vidmode.width() - pWidth.get(0)) / 2,
                     (vidmode.height() - pHeight.get(0)) / 2
             );
-        }
+        }       
 
         glfwMakeContextCurrent(window);
-        glfwSwapInterval(1);
+        glfwSwapInterval(1); // Включаем вертикальную синхронизацию
         glfwShowWindow(window);
 
+        // Загрузка всех функций OpenGL для текущего контекста
         GL.createCapabilities();
 
-        glEnable(GL_DEPTH_TEST); // Глубина для 3D
+        // Включаем тест глубины для 3D
+        glEnable(GL_DEPTH_TEST);
+        // Для прозрачных материалов
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        // Ініціалізація сітки
-        grid = new Grid();
-        grid.setGridSize(0.2f);
-        grid.setGridExtent(5.0f);
+        try {
+            // Загружаем шейдеры
+            mainShaderProgram = ShaderLoader.loadShader(
+                    "/Shader/mainShaderProgram/vertex_shader.glsl",
+                    "/Shader/mainShaderProgram/fragment_shader.glsl"
+            );
+            lightShaderProgram = ShaderLoader.loadShader(
+                    "/Shader/lightShaderProgram/light_vertex.glsl",
+                    "/Shader/lightShaderProgram/light_fragment.glsl"
+            );
 
-        // Ініціалізація мешу
-        Mesh goldMesh = ImportObj.loadObjModel("/Object/gold.obj");
-        Mesh cubeMesh = ImportObj.loadObjModel("/Object/cube.obj");
-        meshes.add(goldMesh);
+        } catch (IOException e) {
+            throw new RuntimeException("Ошибка загрузки шейдеров: " + e.getMessage());
+        }
 
-        // Створення та налаштування камери
+
+
+
+        // Создание и настройка камеры
         camera = new Camera(new Vector3f(3.0f, 3.0f, 3.0f), new Vector3f(0.0f, 1.0f, 0.0f), -135.0f, -30.0f);
-        InputManager = new InputManager(window, camera);
+        inputManager = new InputManager(window, camera);
 
-        editor = new Editor(InputManager, viewport, camera, meshes);
+        // Загрузка моделей и настройка материалов
+        Mesh gold = ImportObj.loadObjModel("/Object/gold.obj");
+        gold.setShaderMaterial(ShaderMaterial.createGold()); // Применяем золотой материал к кубу
 
-        // Сцена
-        rootNode = new Node("rootNode");
-        Node goldNode = new Node("goldNode");
-        goldNode.addMesh(goldMesh);
+        Mesh sphereMesh = ImportObj.loadObjModel("/Object/sphere.obj");
+        sphereMesh.setShaderMaterial(ShaderMaterial.createSilver());
+
+        Mesh cubes = ImportObj.loadObjModel("/Object/cube.obj");
+        cubes.setShaderMaterial(ShaderMaterial.createSilver());
+
+        Mesh sun = ImportObj.loadObjModel("/Object/sphere.obj");
+
+        node = new Node("rootNode");
+            Node meshNode = new Node("meshNode");
+                Node cubeNode = new Node("cubeNode");
+                    cubeNode.addMesh(cubes);
+                    cubeNode.setPosition(2,0,-5);
+                Node goldNode = new Node("goldNode");
+                    goldNode.addMesh(gold);
+                    goldNode.setPosition(4,0,4);
+                Node sphere = new Node("sphereNode");
+                    sphere.addMesh(sphereMesh);
+            Node lightNode = new Node("lightNode");
+                lightNode.addMesh(sun);
+                lightNode.setPosition(5,5,5);
+
+        node.addChild(meshNode);
+            meshNode.addChild(cubeNode);
+            meshNode.addChild(goldNode);
+            meshNode.addChild(sphere);
+        node.addChild(lightNode);
 
 
 
-        Node cubeNode = new Node("cubeNode");
-        cubeNode.setPosition(2.0f, 0.0f, 0.0f);
-        cubeNode.setScale(0.5f, 0.5f, 0.5f);
-        cubeNode.addMesh(cubeMesh);
+        grid = new Grid();
+        editor = new Editor(inputManager, viewport, camera, node);
 
-        rootNode.addChild(goldNode);
-        goldNode.addChild(cubeNode);
+        transformTool = new TransformTool(editor, inputManager,camera,viewport,node);
 
-
+        gui = new GUI(window,editor,node);
     }
 
-
     private void loop() {
+
+        // Цвет фона
+        glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+
         while (!glfwWindowShouldClose(window)) {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // Оновлюємо контролер вводу
-            InputManager.update();
+            // Обновляем контроллер ввода
+            inputManager.update();
+
+            // Получаем матрицы вида и проекции от камеры и вьюпорта
+            Matrix4f viewMatrix = camera.getViewMatrix();
+            Matrix4f projectionMatrix = viewport.getProjectionMatrix();
+
+            for (Node child : node.getChildren()) {
+                switch (child.getName()) {
+                    case "meshNode":
+                        child.render(mainShaderProgram, viewMatrix, projectionMatrix);
+                        break;
+                    case "lightNode":
+                        child.renderLight(lightShaderProgram, viewMatrix, projectionMatrix);
+                        break;
+                }
+            }
+
+
+
+            grid.render(mainShaderProgram, viewMatrix, projectionMatrix);
 
             editor.update();
-
-            // Налаштування проекції та вигляду за допомогою Viewport
-            viewport.setupProjectionMatrix(camera);
-            viewport.applyViewMatrix(camera);
-
-
-            rootNode.renderWireframe();
-
             editor.renderSelection();
 
-            grid.draw();
+            transformTool.update();
+
+            gui.render();
+
+            // Отключаем шейдер
+            glUseProgram(0);
 
             glfwSwapBuffers(window);
             glfwPollEvents();

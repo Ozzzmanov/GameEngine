@@ -222,6 +222,14 @@ public class Camera {
         this.mouseSensitivity = mouseSensitivity;
     }
 
+    public Vector3f getRightVector() {
+        return right;
+    }
+
+    public Vector3f getUpVector() {
+        return up;
+    }
+
     // Перелік можливих напрямків руху камери
     public enum CameraMovement {
         FORWARD,

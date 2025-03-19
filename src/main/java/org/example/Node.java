@@ -1,253 +1,321 @@
 package org.example;
 
+import org.example.Editor.Component;
+import org.example.Editor.NodeListener;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-import org.lwjgl.system.MemoryStack;
 
-import java.nio.FloatBuffer;
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.lwjgl.opengl.GL11.*;
+import java.util.*;
 
 public class Node {
+    // Уникальный идентификатор узла
+    private final UUID id;
     private String name;
     private Node parent;
-    private List<Node> children;
-    private List<Mesh> meshes;
+    private final List<Node> children;
+    private final List<Mesh> meshes;
 
-    // Локальні трансформації
+    // Компоненты узла
+    private final Map<Class<?>, Component> components;
+
     private Vector3f position;
     private Quaternionf rotation;
     private Vector3f scale;
 
-    // Матриця локальної трансформації
     private Matrix4f localTransformation;
-    // Матриця світової трансформації (включає трансформації всіх батьків)
     private Matrix4f worldTransformation;
-
-    // Прапорець, що вказує, чи потрібно перерахувати локальну трансформацію
     private boolean localTransformationDirty;
 
+    // Флаг выбора для редактора
+    private boolean selected;
+
+    // События
+    private final List<NodeListener> listeners;
+
     public Node(String name) {
+        this.id = UUID.randomUUID();
         this.name = name;
         this.children = new ArrayList<>();
         this.meshes = new ArrayList<>();
+        this.components = new HashMap<>();
+        this.listeners = new ArrayList<>();
+
         this.position = new Vector3f(0, 0, 0);
         this.rotation = new Quaternionf();
         this.scale = new Vector3f(1, 1, 1);
         this.localTransformation = new Matrix4f();
         this.worldTransformation = new Matrix4f();
         this.localTransformationDirty = true;
+        this.selected = false;
     }
 
-    /**
-     * Додає дочірній вузол до поточного вузла
-     */
-    public void addChild(Node child) {
-        children.add(child);
-        child.setParent(this);
+    // Добавление компонента к узлу
+    public <T extends Component> void addComponent(T component) {
+        components.put(component.getClass(), component);
+        component.setNode(this);
+        notifyNodeChanged();
     }
 
-    /**
-     * Встановлює батьківський вузол
-     */
-    private void setParent(Node parent) {
-        this.parent = parent;
+    // Получение компонента по типу
+    @SuppressWarnings("unchecked")
+    public <T extends Component> T getComponent(Class<T> componentClass) {
+        return (T) components.get(componentClass);
     }
 
-    /**
-     * Додає меш до поточного вузла
-     */
-    public void addMesh(Mesh mesh) {
-        meshes.add(mesh);
+    // Проверка наличия компонента
+    public boolean hasComponent(Class<?> componentClass) {
+        return components.containsKey(componentClass);
     }
 
-    /**
-     * Встановлює позицію вузла
-     */
-    public void setPosition(float x, float y, float z) {
-        position.set(x, y, z);
-        localTransformationDirty = true;
-    }
-
-    /**
-     * Встановлює обертання вузла
-     */
-    public void setRotation(float x, float y, float z) {
-        rotation.rotationXYZ(x, y, z);
-        localTransformationDirty = true;
-    }
-
-    /**
-     * Встановлює масштаб вузла
-     */
-    public void setScale(float x, float y, float z) {
-        scale.set(x, y, z);
-        localTransformationDirty = true;
-    }
-
-    /**
-     * Оновлює локальну матрицю трансформації
-     */
     private void updateLocalTransformation() {
-        if (localTransformationDirty) {
-            localTransformation.identity()
-                    .translate(position)
-                    .rotate(rotation)
-                    .scale(scale);
-            localTransformationDirty = false;
-        }
+        if (!localTransformationDirty) return;
+
+        localTransformation.identity()
+                .translate(position)
+                .rotate(rotation)
+                .scale(scale);
+
+        localTransformationDirty = false;
     }
 
-    /**
-     * Оновлює світову матрицю трансформації
-     */
-    private void updateWorldTransformation() {
+    public void updateWorldTransformation() {
         updateLocalTransformation();
 
         if (parent != null) {
-            parent.getWorldTransformation().mul(localTransformation, worldTransformation);
+            worldTransformation.set(parent.getWorldTransformation()).mul(localTransformation);
         } else {
             worldTransformation.set(localTransformation);
         }
+
+        for (Mesh mesh : meshes) {
+            mesh.setModelMatrix(worldTransformation);
+        }
+
+        for (Node child : children) {
+            child.updateWorldTransformation();
+        }
     }
 
-    /**
-     * Повертає світову матрицю трансформації
-     */
     public Matrix4f getWorldTransformation() {
+        return new Matrix4f(worldTransformation);
+    }
+
+    public void render(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
         updateWorldTransformation();
-        return worldTransformation;
-    }
-
-    /**
-     * Застосовує світову трансформацію до поточного стану OpenGL
-     */
-    private void applyTransformation() {
-        // Отримуємо та застосовуємо світову матрицю трансформації
-        Matrix4f worldMatrix = getWorldTransformation();
-
-        // Конвертуємо матрицю у формат для OpenGL
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            FloatBuffer fb = stack.mallocFloat(16);
-            worldMatrix.get(fb);
-
-            // Застосовуємо матрицю до поточного стану
-            glPushMatrix();
-            glMultMatrixf(fb);
-        }
-    }
-
-    /**
-     * Відновлює попередній стан трансформації
-     */
-    private void restoreTransformation() {
-        glPopMatrix();
-    }
-
-    /**
-     * Відображає всі меші у цьому вузлі та його дочірніх вузлах
-     */
-    public void render() {
-        applyTransformation();
-
-        // Відображаємо всі меші, що належать цьому вузлу
-        for (Mesh mesh : meshes) {
-            mesh.render();
-        }
-
-        // Відображаємо всі дочірні вузли
-        for (Node child : children) {
-            child.render();
-        }
-
-        restoreTransformation();
-    }
-
-    /**
-     * Відображає всі меші у цьому вузлі та його дочірніх вузлах у режимі каркаса
-     */
-    public void renderWireframe() {
-        applyTransformation();
 
         for (Mesh mesh : meshes) {
-            mesh.renderWireframe();
+            mesh.render(shaderProgram, viewMatrix, projectionMatrix);
         }
 
         for (Node child : children) {
-            child.renderWireframe();
+            child.render(shaderProgram, viewMatrix, projectionMatrix);
         }
-
-        restoreTransformation();
     }
 
-    /**
-     * Відображає всі вершини у цьому вузлі та його дочірніх вузлах
-     */
-    public void renderVertices() {
-        applyTransformation();
+    public void renderLight(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+        updateWorldTransformation();
 
         for (Mesh mesh : meshes) {
-            mesh.renderVertices();
+            mesh.renderLight(shaderProgram, viewMatrix, projectionMatrix);
         }
 
         for (Node child : children) {
-            child.renderVertices();
+            child.renderLight(shaderProgram, viewMatrix, projectionMatrix);
         }
-
-        restoreTransformation();
     }
 
-    /**
-     * Відображає всі ребра у цьому вузлі та його дочірніх вузлах
-     */
-    public void renderEdges() {
-        applyTransformation();
-
-        for (Mesh mesh : meshes) {
-            mesh.renderEdges();
-        }
-
-        for (Node child : children) {
-            child.renderEdges();
-        }
-
-        restoreTransformation();
-    }
-
-    /**
-     * Очищає ресурси всіх мешів у цьому вузлі та його дочірніх вузлах
-     */
     public void cleanup() {
         for (Mesh mesh : meshes) {
             mesh.cleanup();
         }
-
         for (Node child : children) {
             child.cleanup();
         }
+        // Очистка компонентов
+        for (Component component : components.values()) {
+            component.cleanup();
+        }
     }
 
-    /**
-     * Отримує ім'я вузла
-     */
+    public void addChild(Node child) {
+        children.add(child);
+        child.setParent(this);
+        notifyNodeChanged();
+    }
+
+    public void removeChild(Node child) {
+        if (children.remove(child)) {
+            child.setParent(null);
+            notifyNodeChanged();
+        }
+    }
+
+    private void setParent(Node parent) {
+        this.parent = parent;
+    }
+
+    public void addMesh(Mesh mesh) {
+        meshes.add(mesh);
+        notifyNodeChanged();
+    }
+
+    public void removeMesh(Mesh mesh) {
+        if (meshes.remove(mesh)) {
+            notifyNodeChanged();
+        }
+    }
+
+    public void setPosition(float x, float y, float z) {
+        position.set(x, y, z);
+        localTransformationDirty = true;
+        notifyNodeChanged();
+    }
+
+    public void setRotation(float x, float y, float z) {
+        rotation.rotationXYZ(x, y, z);
+        localTransformationDirty = true;
+        notifyNodeChanged();
+    }
+
+    public void setScale(float x, float y, float z) {
+        scale.set(x, y, z);
+        localTransformationDirty = true;
+        notifyNodeChanged();
+    }
+
+    // Методы для выделения узла
+    public void setSelected(boolean selected) {
+        this.selected = selected;
+        notifySelectionChanged();
+    }
+
+    public boolean isSelected() {
+        return selected;
+    }
+
+    // Методы для работы с событиями узла
+    public void addNodeListener(NodeListener listener) {
+        listeners.add(listener);
+    }
+
+    public void removeNodeListener(NodeListener listener) {
+        listeners.remove(listener);
+    }
+
+    private void notifyNodeChanged() {
+        for (NodeListener listener : listeners) {
+            listener.onNodeChanged(this);
+        }
+    }
+
+    private void notifySelectionChanged() {
+        for (NodeListener listener : listeners) {
+            listener.onSelectionChanged(this, selected);
+        }
+    }
+
+    // Методы для поиска узлов в сцене
+    public Node findNodeById(UUID id) {
+        if (this.id.equals(id)) {
+            return this;
+        }
+
+        for (Node child : children) {
+            Node found = child.findNodeById(id);
+            if (found != null) {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    public Node findNodeByName(String name) {
+        if (this.name.equals(name)) {
+            return this;
+        }
+
+        for (Node child : children) {
+            Node found = child.findNodeByName(name);
+            if (found != null) {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    // Получение всех узлов в сцене
+    public List<Node> getAllNodes() {
+        List<Node> allNodes = new ArrayList<>();
+        collectNodes(allNodes);
+        return allNodes;
+    }
+
+    private void collectNodes(List<Node> nodes) {
+        nodes.add(this);
+        for (Node child : children) {
+            child.collectNodes(nodes);
+        }
+    }
+
+    // Геттеры
+    public UUID getId() {
+        return id;
+    }
+
     public String getName() {
         return name;
     }
 
-    /**
-     * Отримує дочірні вузли
-     */
-    public List<Node> getChildren() {
-        return children;
+    public void setName(String name) {
+        this.name = name;
+        notifyNodeChanged();
     }
 
-    /**
-     * Отримує список мешів вузла
-     */
+    public Node getParent() {
+        return parent;
+    }
+
+    public List<Node> getChildren() {
+        return new ArrayList<>(children);
+    }
+
     public List<Mesh> getMeshes() {
-        return meshes;
+        return new ArrayList<>(meshes);
+    }
+
+    public Vector3f getPosition() {
+        return new Vector3f(position);
+    }
+
+    public Quaternionf getRotation() {
+        return new Quaternionf(rotation);
+    }
+
+    public Vector3f getScale() {
+        return new Vector3f(scale);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Node node = (Node) o;
+        return id.equals(node.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "Node{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                '}';
     }
 }

@@ -153,10 +153,11 @@ public class InputManager {
             camera.positionKeyboard(Camera.CameraPosition.BOTTOM);
         }
 
-        // Вихід з програми при натисканні ESC
-        if (keys[GLFW_KEY_ESCAPE]) {
-            glfwSetWindowShouldClose(window, true);
-        }
+
+//        // Вихід з програми при натисканні ESC
+//        if (keys[GLFW_KEY_ESCAPE]) {
+//            glfwSetWindowShouldClose(window, true);
+//        }
 
         // Перемикання режиму миші при натисканні TAB
         if (keysPressed[GLFW_KEY_TAB]) {
@@ -216,6 +217,7 @@ public class InputManager {
         return keysPressed[key];
     }
 
+
     /**
      * Перевіряє чи була відпущена клавіша у поточному кадрі
      */
@@ -233,7 +235,7 @@ public class InputManager {
     /**
      * Перевіряє чи натиснута кнопка миші
      */
-    public boolean isMouseButtonDown(int button) {
+    public boolean isMouseButtonPressed(int button) {
         return mouseButtons[button];
     }
 
