@@ -75,7 +75,7 @@ public class Mesh {
         glUseProgram(shaderProgram);
         glBindVertexArray(vaoID);
 
-        // Позиция источника света (можно вынести в настройки или класс Light)
+        // Позиция источника света
         int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
         glUniform3f(lightPosLoc, 5.0f, 5.0f, 5.0f); // Позиция света (соответствует сфере)
 

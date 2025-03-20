@@ -191,10 +191,12 @@ public class Core {
 
         grid = new Grid();
         editor = new Editor(inputManager, viewport, camera, node);
+        camera.setEditor(editor); // Передаем editor
+
 
         transformTool = new TransformTool(editor, inputManager,camera,viewport,node);
 
-        gui = new GUI(window,editor,node);
+        gui = new GUI(window,editor,node,transformTool);
     }
 
     private void loop() {
@@ -222,8 +224,6 @@ public class Core {
                         break;
                 }
             }
-
-
 
             grid.render(mainShaderProgram, viewMatrix, projectionMatrix);
 

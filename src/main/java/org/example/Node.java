@@ -178,6 +178,13 @@ public class Node {
         notifyNodeChanged();
     }
 
+    // Добавьте этот метод в класс Node
+    public void setRotationQuaternion(Quaternionf newRotation) {
+        this.rotation.set(newRotation);
+        localTransformationDirty = true;
+        notifyNodeChanged();
+    }
+
     public void setScale(float x, float y, float z) {
         scale.set(x, y, z);
         localTransformationDirty = true;

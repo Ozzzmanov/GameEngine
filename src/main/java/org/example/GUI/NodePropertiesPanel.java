@@ -205,8 +205,8 @@ public class NodePropertiesPanel {
                 updateMaterialUIValues(mesh.getShaderMaterial());
             }
             ImGui.sameLine();
-            if (ImGui.button("Bronze", 60, 25)) {
-                mesh.setShaderMaterial(ShaderMaterial.createGreen());
+            if (ImGui.button("Holographic", 60, 25)) {
+                mesh.setShaderMaterial(ShaderMaterial.createHolographicMaterial());
                 updateMaterialUIValues(mesh.getShaderMaterial());
             }
         } else {

@@ -1,9 +1,13 @@
 package org.example;
 
+import org.example.Editor.Editor;
+import org.example.Editor.EditorListener;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
-public class Camera {
+public class Camera implements EditorListener {
+    private Editor editor;
+
     // Позиція камери
     private Vector3f position;
     // Вектор напрямку (куди дивиться камера)
@@ -15,6 +19,7 @@ public class Camera {
     // Світовий вектор "вгору"
     private final Vector3f worldUp;
 
+
     // Кути Ейлера
     private float yaw;   // Поворот вліво/вправо (навколо осі Y)
     private float pitch; // Поворот вгору/вниз (навколо осі X)
@@ -24,9 +29,9 @@ public class Camera {
     private float mouseSensitivity = 0.1f;
     private float zoom = 45.0f;
 
-    public Camera() {
-        this(new Vector3f(0.0f, 0.0f, 3.0f), new Vector3f(0.0f, 1.0f, 0.0f), -90.0f, 0.0f);
-    }
+    private float offsetCamera = 12.0f;
+
+    private Node selectedNode = null;
 
     /**
      * Конструктор з користувацькими параметрами
@@ -113,41 +118,42 @@ public class Camera {
                 break;
         }
     }
-    public void positionKeyboard(CameraPosition cameraPosition){
 
+    public void positionKeyboard(CameraPosition cameraPosition){
+        Vector3f positionNode = selectedNode.getPosition();
         switch (cameraPosition){
             case FRONT:
-                position.set(8.0f,0.0f,0.0f);
+                position.set(positionNode.x + offsetCamera, positionNode.y, positionNode.z);
                 yaw = 180;
                 pitch = 0;
                 break;
 
             case BACK:
-                position.set(-8.0f,0.0f,0.0f);
+                position.set(positionNode.x - offsetCamera, positionNode.y, positionNode.z);
                 yaw = 0;
                 pitch = 0;
                 break;
 
             case RIGHT:
-                position.set(0.0f,0.0f,8.0f);
+                position.set(positionNode.x, positionNode.y, positionNode.z + offsetCamera);
                 yaw = -90;
                 pitch = 0;
                 break;
 
             case LEFT:
-                position.set(0.0f,0.0f,-8.0f);
+                position.set(positionNode.x, positionNode.y, positionNode.z - offsetCamera);
                 yaw = 90;
                 pitch = 0;
                 break;
 
             case TOP:
-                position.set(0.0f,8.0f,0.0f);
+                position.set(positionNode.x, positionNode.y + offsetCamera, positionNode.z);
                 yaw = 0;
                 pitch = -90;
                 break;
 
             case BOTTOM:
-                position.set(0.0f,-8.0f,0.0f);
+                position.set(positionNode.x, positionNode.y - offsetCamera, positionNode.z);
                 yaw = 0;
                 pitch = 90;
                 break;
@@ -230,6 +236,7 @@ public class Camera {
         return up;
     }
 
+
     // Перелік можливих напрямків руху камери
     public enum CameraMovement {
         FORWARD,
@@ -248,4 +255,25 @@ public class Camera {
         TOP, // +Y
         BOTTOM // -Y
     }
+
+    @Override
+    public void onNodeSelected(Node node) {
+        selectedNode = node;
+    }
+
+    @Override
+    public void onSelectionCleared() {
+
+    }
+
+    @Override
+    public void onSceneChanged() {
+
+    }
+
+    public void setEditor(Editor editor) {
+        this.editor = editor;
+        this.editor.addEditorListener(this);
+    }
+
 }

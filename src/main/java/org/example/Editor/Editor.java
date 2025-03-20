@@ -22,8 +22,17 @@ public class Editor implements NodeListener {
     private Camera camera;
     private Node rootNode;
     private Node selectedNode = null;
-    private Node arrowsRootNode;
 
+    // Тип вузла для визначення ролі у сцені
+    public enum NodeType {
+        SCENE_OBJECT,     // Звичайний об'єкт сцени
+        TRANSFORM_TOOL,   // Інструмент трансформації (стрілки)
+        ROTATION_TOOL,    // Інструмент обертання (кола)
+        SCALE_TOOL    // Інструмент масштабування
+    }
+
+    // Список кореневих вузлів для різних типів інструментів
+    private Map<NodeType, Node> toolRootNodes = new HashMap<>();
 
     // Shader program для цветового выбора объектов
     private int pickingShaderProgram;
@@ -38,6 +47,9 @@ public class Editor implements NodeListener {
     private Map<UUID, Integer> nodeIdToColor = new HashMap<>();
     private int nextColorId = 1; // Начинаем с 1, 0 зарезервировано для фона
 
+    // Карта вузлів до їх типів
+    private Map<UUID, NodeType> nodeIdToType = new HashMap<>();
+
     // События редактора
     private List<EditorListener> listeners = new ArrayList<>();
 
@@ -46,6 +58,9 @@ public class Editor implements NodeListener {
         this.viewport = viewport;
         this.camera = camera;
         this.rootNode = rootNode;
+
+        // Реєструємо кореневий вузол сцени
+        toolRootNodes.put(NodeType.SCENE_OBJECT, rootNode);
 
         // Инициализируем шейдер для цветового выбора
         initPickingShader();
@@ -106,19 +121,22 @@ public class Editor implements NodeListener {
         for (Node node : allNodes) {
             if (!node.getMeshes().isEmpty()) {
                 // Присваиваем цвет только узлам с мешами
-                assignColorToNode(node);
+                assignColorToNode(node, NodeType.SCENE_OBJECT);
             }
         }
     }
+
     // Реєструємо ноду для пікингу
-    public void registerNodeForPicking(Node node) {
-
+    public void registerNodeForPicking(Node node, NodeType nodeType) {
         if (!node.getMeshes().isEmpty() && !nodeIdToColor.containsKey(node.getId())) {
-            assignColorToNode(node);
-
+            assignColorToNode(node, nodeType);
         }
     }
 
+    // Перевантажений метод для сумісності із старим кодом
+    public void registerNodeForPicking(Node node) {
+        registerNodeForPicking(node, NodeType.SCENE_OBJECT);
+    }
 
     private void subscribeToNodeEvents(Node node) {
         node.addNodeListener(this);
@@ -128,10 +146,11 @@ public class Editor implements NodeListener {
     }
 
     // Присваивание уникального цвета узлу
-    private void assignColorToNode(Node node) {
+    private void assignColorToNode(Node node, NodeType nodeType) {
         int colorId = nextColorId++;
         nodeIdToColor.put(node.getId(), colorId);
         colorToNodeId.put(colorId, node.getId());
+        nodeIdToType.put(node.getId(), nodeType);
     }
 
     public void resizePickingFBO(int width, int height) {
@@ -147,7 +166,7 @@ public class Editor implements NodeListener {
     }
 
     public void update() {
-        // Перевіряємо натискання ПРАВОЇ кнопки миші для вибору об'єкта
+        // Перевіряємо натискання ЛІВОЇ кнопки миші для вибору об'єкта
         if (inputManager.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT) &&
                 !inputManager.isCursorLocked() &&
                 !ImGui.getIO().getWantCaptureMouse()) {
@@ -208,12 +227,11 @@ public class Editor implements NodeListener {
         int mvpLoc = glGetUniformLocation(pickingShaderProgram, "mvp");
         int colorLoc = glGetUniformLocation(pickingShaderProgram, "objectColor");
 
-        // Рекурсивно рендерим все узлы с уникальными цветами
-        renderNodeForPicking(rootNode, viewMatrix, projectionMatrix, mvpLoc, colorLoc);
-
-        // Рендеримо стрілки, якщо вони видимі
-        if (arrowsRootNode != null && selectedNode != null) {
-            renderNodeForPicking(arrowsRootNode, viewMatrix, projectionMatrix, mvpLoc, colorLoc);
+        // Рендерим усі типи вузлів
+        for (Node rootNode : toolRootNodes.values()) {
+            if (rootNode != null) {
+                renderNodeForPicking(rootNode, viewMatrix, projectionMatrix, mvpLoc, colorLoc);
+            }
         }
 
         glUseProgram(0);
@@ -291,44 +309,68 @@ public class Editor implements NodeListener {
         // Находим выбранный узел по ID
         UUID nodeId = colorToNodeId.get(colorId);
         if (nodeId != null) {
-            // Спочатку перевіряємо, чи належить вузол до стрілок
-            Node node = null;
+            // Отримуємо тип вузла
+            NodeType nodeType = nodeIdToType.get(nodeId);
 
-            if (arrowsRootNode != null) {
-                node = arrowsRootNode.findNodeById(nodeId);
-            }
-
-            // Якщо вузол не належить до стрілок, шукаємо в основній сцені
-            if (node == null) {
-                node = rootNode.findNodeById(nodeId);
-            }
+            // Знаходимо вузол в залежності від його типу
+            Node node = findNodeById(nodeId);
 
             if (node != null) {
-                // Перевіряємо, чи не є вузол стрілкою
-                boolean isArrow = false;
-                if (arrowsRootNode != null) {
-                    for (Node arrowNode : arrowsRootNode.getChildren()) {
-                        if (arrowNode == node) {
-                            isArrow = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (isArrow) {
-                    // Обробляємо вибір стрілки
-                    for (EditorListener listener : listeners) {
-                        listener.onNodeSelected(node);
-                    }
-                    System.out.println("Вибрано стрілку: " + node.getName());
-                } else {
-                    // Вибір звичайного об'єкта
-                    selectNode(node);
-                    System.out.println("Вибрано об'єкт: " + node.getName() + " (ID: " + node.getId() + ")");
-                }
+                // Викликаємо відповідний обробник в залежності від типу вузла
+                handleNodeSelection(node, nodeType);
             }
         } else {
             clearSelection();
+        }
+    }
+
+    // Метод для пошуку вузла за його ID у всіх доступних кореневих вузлах
+    private Node findNodeById(UUID nodeId) {
+        for (Node rootNode : toolRootNodes.values()) {
+            if (rootNode != null) {
+                Node node = rootNode.findNodeById(nodeId);
+                if (node != null) {
+                    return node;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Метод для обробки вибору вузла в залежності від його типу
+    private void handleNodeSelection(Node node, NodeType nodeType) {
+        switch (nodeType) {
+            case SCENE_OBJECT:
+                // Обробляємо вибір звичайного об'єкта сцени
+                selectNode(node);
+
+                break;
+
+            case TRANSFORM_TOOL:
+                for (EditorListener listener : listeners) {
+                    listener.onNodeSelected(node);
+                }
+
+                break;
+
+            case ROTATION_TOOL:
+                for (EditorListener listener : listeners) {
+                    listener.onNodeSelected(node);
+                }
+
+                break;
+
+            case SCALE_TOOL:
+                for (EditorListener listener : listeners) {
+                    listener.onNodeSelected(node);
+                }
+
+                break;
+
+            default:
+                // Для невідомих типів вузлів просто вибираємо їх
+                selectNode(node);
+                break;
         }
     }
 
@@ -469,7 +511,6 @@ public class Editor implements NodeListener {
         return selectedNode;
     }
 
-
     public void notifySceneChanged() {
         // Уведомляем всех слушателей о изменении сцены
         for (EditorListener listener : listeners) {
@@ -477,13 +518,30 @@ public class Editor implements NodeListener {
         }
     }
 
-    public void setArrowsRootNode(Node arrowsRootNode) {
-        this.arrowsRootNode = arrowsRootNode;
+    // Оновлені методи для роботи з інструментами
+    public void setToolRootNode(NodeType nodeType, Node rootNode) {
+        toolRootNodes.put(nodeType, rootNode);
 
-        // Реєструємо всі дочірні вузли стрілок для пікінгу
-        for (Node child : arrowsRootNode.getChildren()) {
-            registerNodeForPicking(child);
+        // Реєструємо всі дочірні вузли для пікінгу з відповідним типом
+        if (rootNode != null) {
+            for (Node child : rootNode.getChildren()) {
+                registerNodeForPicking(child, nodeType);
+            }
         }
+    }
+
+    // Метод для сумісності із старим кодом
+    public void setArrowsRootNode(Node arrowsRootNode) {
+        setToolRootNode(NodeType.TRANSFORM_TOOL, arrowsRootNode);
+    }
+
+    // Метод для сумісності із старим кодом
+    public void setCircleRootNode(Node circleRootNode) {
+        setToolRootNode(NodeType.ROTATION_TOOL, circleRootNode);
+    }
+
+    public void setVectorScaleRootNode(Node scaleRootNode) {
+        setToolRootNode(NodeType.SCALE_TOOL, scaleRootNode);
     }
 
     public void cleanup() {

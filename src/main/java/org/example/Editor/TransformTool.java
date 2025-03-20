@@ -6,10 +6,13 @@ import org.joml.Vector2f;
 import org.joml.Vector3f;
 
 import java.io.IOException;
+import java.util.AbstractMap;
 
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
 import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
 
+import java.util.Map;
+import java.util.AbstractMap.SimpleEntry;
 /**
  * Інструмент трансформації для сцени редактора.
  * Дозволяє переміщати, обертати та масштабувати вибрані об'єкти.
@@ -46,7 +49,7 @@ public class TransformTool implements EditorListener {
 
     // Константи для чутливості трансформації
     private final float TRANSLATE_SENSITIVITY = 0.01f;
-    private final float ROTATE_SENSITIVITY = 0.5f;
+    private final float ROTATE_SENSITIVITY = 0.02f;
     private final float SCALE_SENSITIVITY = 0.01f;
 
     // Меші для стрілок трансформації
@@ -59,6 +62,29 @@ public class TransformTool implements EditorListener {
     private Node arrowYNode;
     private Node arrowZNode;
     private Node arrowsRootNode; // Корневий вузол для всіх стрілок
+
+
+    // Меші для кутів ейлера
+    private Mesh circleYawMesh;
+    private Mesh circlePitchMesh;
+    private Mesh circleRollMesh;
+
+    // Ноди для кутів ейлера
+    private Node circleYawNode;
+    private Node circlePitchNode;
+    private Node circleRollNode;
+    private Node circleRootNode;
+
+    // Меші для векторів scale
+    private Mesh vectorXScaleMesh;
+    private Mesh vectorYScaleMesh;
+    private Mesh vectorZScaleMesh;
+
+    // Ноди для векторів scale
+    private Node vectorXNode;
+    private Node vectorYNode;
+    private Node vectorZNode;
+    private Node scaleRootNode;
 
     private int mainShaderProgram;
 
@@ -84,13 +110,31 @@ public class TransformTool implements EditorListener {
     }
 
     private void initEditorTools() {
-        // Створюємо кореневий вузол для стрілок
+
+        initArrows();
+        initCircle();
+        initVector();
+
+
+
+        try {
+            // Завантажуємо шейдери
+            mainShaderProgram = ShaderLoader.loadShader(
+                    "/Shader/mainShaderProgram/vertex_shader.glsl",
+                    "/Shader/mainShaderProgram/fragment_shader.glsl"
+            );
+        } catch (IOException e) {
+            throw new RuntimeException("Помилка завантаження шейдерів: " + e.getMessage());
+        }
+    }
+
+    private void initArrows(){
         arrowsRootNode = new Node("arrowsRootNode");
 
         // Завантажуємо меш стрілки
-        arrowXMesh = ImportObj.loadObjModel("/Object/Tool/ArrowMeshX.obj");
-        arrowYMesh = ImportObj.loadObjModel("/Object/Tool/ArrowMeshY.obj");
-        arrowZMesh = ImportObj.loadObjModel("/Object/Tool/ArrowMeshZ.obj");
+        arrowXMesh = ImportObj.loadObjModel("/Object/Tools/Arrow/ArrowMeshX.obj");
+        arrowYMesh = ImportObj.loadObjModel("/Object/Tools/Arrow/ArrowMeshY.obj");
+        arrowZMesh = ImportObj.loadObjModel("/Object/Tools/Arrow/ArrowMeshZ.obj");
 
         // Встановлюємо матеріали для стрілок (червоний, зелений, синій)
         arrowXMesh.setShaderMaterial(ShaderMaterial.createRed());
@@ -117,43 +161,100 @@ public class TransformTool implements EditorListener {
 
 
         editor.setArrowsRootNode(arrowsRootNode);
-//        rootNode.addChild(arrowsRootNode);
-
-
-
-
-        try {
-            // Завантажуємо шейдери
-            mainShaderProgram = ShaderLoader.loadShader(
-                    "/Shader/mainShaderProgram/vertex_shader.glsl",
-                    "/Shader/mainShaderProgram/fragment_shader.glsl"
-            );
-        } catch (IOException e) {
-            throw new RuntimeException("Помилка завантаження шейдерів: " + e.getMessage());
-        }
     }
 
-    /**
-     * Обробник вибору вузла в редакторі.
-     *
-     * @param node вибраний вузол
-     */
+    private void initCircle(){
+        circleRootNode = new Node("circleRootNode");
+
+        // Завантажуємо меш кутів ейлера
+        circleYawMesh = ImportObj.loadObjModel("/Object/Tools/Circle/CircleMeshYaw.obj");
+        circlePitchMesh = ImportObj.loadObjModel("/Object/Tools/Circle/CircleMeshPitch.obj");
+        circleRollMesh = ImportObj.loadObjModel("/Object/Tools/Circle/CircleMeshRoll.obj");
+
+        // Встановлюємо матеріали для кутів ейлера (червоний, зелений, синій)
+        circleYawMesh.setShaderMaterial(ShaderMaterial.createRed());
+        circlePitchMesh.setShaderMaterial(ShaderMaterial.createGreen());
+        circleRollMesh.setShaderMaterial(ShaderMaterial.createBlue());
+
+        // Створюємо ноди для кутів
+        circleYawNode = new Node("circleYawNode");
+        circlePitchNode = new Node("circlePitchNode");
+        circleRollNode = new Node("circleRollNode");
+
+        // Додаємо меші до нод
+        circleYawNode.addMesh(circleYawMesh);
+        circlePitchNode.addMesh(circlePitchMesh);
+        circleRollNode.addMesh(circleRollMesh);
+
+
+        // Додаємо кути до кореневого вузла
+        circleRootNode.addChild(circleYawNode);
+        circleRootNode.addChild(circlePitchNode);
+        circleRootNode.addChild(circleRollNode);
+
+        // Ховаємо кути, поки немає вибраного об'єкта
+        circleRootNode.setScale(0, 0, 0);
+
+        editor.setCircleRootNode(circleRootNode);
+    }
+
+    private void initVector(){
+        scaleRootNode = new Node("scaleRootNode");
+
+        // Завантажуємо меш векторів scale
+        vectorXScaleMesh = ImportObj.loadObjModel("/Object/Tools/scaleVector/scaleVectorX.obj");
+        vectorYScaleMesh = ImportObj.loadObjModel("/Object/Tools/scaleVector/scaleVectorY.obj");
+        vectorZScaleMesh = ImportObj.loadObjModel("/Object/Tools/scaleVector/scaleVectorZ.obj");
+
+        // Встановлюємо матеріали
+        vectorXScaleMesh.setShaderMaterial(ShaderMaterial.createRed());
+        vectorYScaleMesh.setShaderMaterial(ShaderMaterial.createGreen());
+        vectorZScaleMesh.setShaderMaterial(ShaderMaterial.createBlue());
+
+        // Створюємо ноди
+        vectorXNode = new Node("vectorXNode");
+        vectorYNode = new Node("vectorYNode");
+        vectorZNode = new Node("vectorZNode");
+
+        // Додаємо меші до нод
+        vectorXNode.addMesh(vectorXScaleMesh);
+        vectorYNode.addMesh(vectorYScaleMesh);
+        vectorZNode.addMesh(vectorZScaleMesh);
+
+        // Додаємодо кореневого вузла
+        scaleRootNode.addChild(vectorXNode);
+        scaleRootNode.addChild(vectorYNode);
+        scaleRootNode.addChild(vectorZNode);
+
+        scaleRootNode.setScale(0, 0, 0);
+
+        editor.setVectorScaleRootNode(scaleRootNode);
+    }
+
+
     @Override
     public void onNodeSelected(Node node) {
-        // Спочатку перевіряємо, чи це стрілка
-        if (node == arrowXNode) {
-            // Якщо вибрана стрілка X, активуємо режим перетягування для осі X
-            currentAxis = TransformAxis.X;
-            startDragging();
-            return;
-        } else if (node == arrowYNode) {
-            // Якщо вибрана стрілка Y, активуємо режим перетягування для осі Y
-            currentAxis = TransformAxis.Y;
-            startDragging();
-            return;
-        } else if (node == arrowZNode) {
-            // Якщо вибрана стрілка Z, активуємо режим перетягування для осі Z
-            currentAxis = TransformAxis.Z;
+        Map<Node, TransformAxis> axisMap = Map.of(
+                arrowXNode, TransformAxis.X,
+                arrowYNode, TransformAxis.Y,
+                arrowZNode, TransformAxis.Z,
+                circleYawNode, TransformAxis.X,
+                circlePitchNode, TransformAxis.Y,
+                circleRollNode, TransformAxis.Z,
+                vectorXNode, TransformAxis.X,
+                vectorYNode, TransformAxis.Y,
+                vectorZNode, TransformAxis.Z
+        );
+
+        if (axisMap.containsKey(node)) {
+            currentAxis = axisMap.get(node);
+            if (node == circleYawNode || node == circlePitchNode || node == circleRollNode) {
+                currentMode = TransformMode.ROTATE;
+            } else if (node == vectorXNode || node == vectorYNode || node == vectorZNode) {
+                currentMode = TransformMode.SCALE;
+            } else {
+                currentMode = TransformMode.TRANSLATE;
+            }
             startDragging();
             return;
         }
@@ -161,29 +262,21 @@ public class TransformTool implements EditorListener {
         // Якщо вибраний звичайний вузол
         selectedNode = node;
 
-        // Зберігаємо початкову позицію при виборі вузла
         if (node != null) {
             startPosition = new Vector3f(node.getPosition());
             startRotation = new Quaternionf(node.getRotation());
             startScale = new Vector3f(node.getScale());
 
-            // Показуємо стрілки трансформації і переміщуємо їх до вибраного вузла
-            arrowsRootNode.setPosition(node.getPosition().x, node.getPosition().y, node.getPosition().z);
-            arrowsRootNode.setScale(1, 1, 1);
-
-            // Додаємо стрілки до кореневого вузла сцени тільки якщо їх ще немає
-            if (!rootNode.getChildren().contains(arrowsRootNode)) {
-                rootNode.addChild(arrowsRootNode);
-            }
+            // Оновлюємо видимість інструментів відповідно до поточного режиму
+            updateToolsVisibility();
         } else {
-            // Ховаємо стрілки, якщо немає вибраного вузла
             arrowsRootNode.setScale(0, 0, 0);
+            circleRootNode.setScale(0, 0, 0);
+            scaleRootNode.setScale(0, 0, 0);
         }
     }
 
-    /**
-     * Обробник очищення вибору в редакторі.
-     */
+
     @Override
     public void onSelectionCleared() {
         selectedNode = null;
@@ -193,30 +286,30 @@ public class TransformTool implements EditorListener {
         if (rootNode.getChildren().contains(arrowsRootNode)) {
             rootNode.removeChild(arrowsRootNode);
         }
+        if (rootNode.getChildren().contains(circleRootNode)) {
+            rootNode.removeChild(circleRootNode);
+        }
+        if (rootNode.getChildren().contains(scaleRootNode)) {
+            rootNode.removeChild(scaleRootNode);
+        }
 
-        // Ховаємо стрілки
+        // Ховаємо
         arrowsRootNode.setScale(0, 0, 0);
+        circleRootNode.setScale(0, 0, 0);
+        scaleRootNode.setScale(0, 0, 0);
     }
 
-    /**
-     * Обробник зміни сцени.
-     */
     @Override
     public void onSceneChanged() {
-        // Оновлюємо положення стрілок при зміні сцени
+        // Оновлюємо положення активного інструменту при зміні сцени
         if (selectedNode != null) {
-            arrowsRootNode.setPosition(selectedNode.getPosition().x, selectedNode.getPosition().y, selectedNode.getPosition().z);
+            updateToolsVisibility();
         }
     }
 
-    /**
-     * Оновлює стан інструменту трансформації.
-     * Має викликатися у кожному кадрі.
-     */
     public void update() {
         // Якщо є вибраний вузол і режим перетягування активний
         if (isDragging && selectedNode != null) {
-
             // Обробляємо трансформацію відповідно до обраного режиму
             switch (currentMode) {
                 case TRANSLATE:
@@ -241,25 +334,63 @@ public class TransformTool implements EditorListener {
             cancelTransform();
         }
 
-        // Рендеримо стрілки трансформації, якщо є вибраний вузол
+        // Рендеримо тільки активний інструмент трансформації, якщо є вибраний вузол
         if (selectedNode != null && !isDragging) {
-            arrowsRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix());
+            switch (currentMode) {
+                case TRANSLATE:
+                    arrowsRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix());
+                    break;
+                case ROTATE:
+                    circleRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix());
+                    break;
+                case SCALE:
+                    scaleRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix());
+                    break;
+            }
         }
     }
 
-    /**
-     * Встановлює режим трансформації.
-     *
-     * @param mode новий режим трансформації
-     */
     public void setTransformMode(TransformMode mode) {
         currentMode = mode;
-        System.out.println("Режим трансформації: " + mode);
+
+        updateToolsVisibility();
     }
 
     /**
-     * Починає процес трансформації.
+     * Оновлює видимість інструментів трансформації в залежності від поточного режиму
      */
+    private void updateToolsVisibility() {
+        if (selectedNode == null) return;
+
+        float scale = 2.5f;
+        Vector3f position = selectedNode.getPosition();
+
+        // Ховаємо всі інструменти спочатку
+        arrowsRootNode.setScale(0, 0, 0);
+        circleRootNode.setScale(0, 0, 0);
+        scaleRootNode.setScale(0, 0, 0);
+
+        // Показуємо тільки активний інструмент
+        switch (currentMode) {
+            case TRANSLATE:
+                arrowsRootNode.setPosition(position.x, position.y, position.z);
+                arrowsRootNode.setScale(scale, scale, scale);
+                break;
+            case ROTATE:
+                circleRootNode.setPosition(position.x, position.y, position.z);
+                circleRootNode.setScale(scale, scale, scale);
+                break;
+            case SCALE:
+                scaleRootNode.setPosition(position.x, position.y, position.z);
+                scaleRootNode.setScale(scale, scale, scale);
+                break;
+        }
+    }
+
+    public TransformMode getCurrentMode() {
+        return currentMode;
+    }
+
     private void startDragging() {
         if (selectedNode == null) return;
 
@@ -272,12 +403,8 @@ public class TransformTool implements EditorListener {
             inputManager.toggleCursor();
         }
 
-        System.out.println("Розпочато перетягування: " + selectedNode.getName() + " вздовж осі " + currentAxis);
     }
 
-    /**
-     * Обробляє переміщення об'єкта.
-     */
     private void handleTranslation() {
         Vector2f currentMouse = new Vector2f(inputManager.getMouseX(), inputManager.getMouseY());
         Vector2f delta = new Vector2f(currentMouse).sub(startMousePosition);
@@ -332,47 +459,137 @@ public class TransformTool implements EditorListener {
 
         // Оновлюємо позицію стрілок
         arrowsRootNode.setPosition(newPosition.x, newPosition.y, newPosition.z);
+
+        // Оновлюємо позицію кутів
+        circleRootNode.setPosition(newPosition.x, newPosition.y, newPosition.z);
+
+        scaleRootNode.setPosition(newPosition.x, newPosition.y, newPosition.z);
     }
 
-    /**
-     * Обробляє обертання об'єкта.
-     */
     private void handleRotation() {
         Vector2f currentMouse = new Vector2f(inputManager.getMouseX(), inputManager.getMouseY());
         Vector2f delta = new Vector2f(currentMouse).sub(startMousePosition);
-        delta.mul(ROTATE_SENSITIVITY * 0.01f);
+        delta.mul(ROTATE_SENSITIVITY);
 
-        // Отримуємо поточні кути повороту
-        Vector3f rotationAngles = new Vector3f();
-        selectedNode.getRotation().getEulerAnglesXYZ(rotationAngles);
+        // Получаем текущий кватернион вращения
+        Quaternionf currentRotation = selectedNode.getRotation();
 
-        // Застосовуємо обертання в залежності від обраної осі
+        // Создаем временные кватернионы для инкрементального вращения
+        Quaternionf deltaRotation = new Quaternionf();
+
+        // Получаем векторы камеры
+        Vector3f cameraRight = camera.getRightVector();
+        Vector3f cameraUp = camera.getUpVector();
+        Vector3f cameraForward = camera.getFront();
+
+        // Определяем оси вращения в зависимости от текущего режима
+        Vector3f rotationAxis = new Vector3f();
+        float angle = 0;
+
         switch (currentAxis) {
             case X:
-                rotationAngles.x += delta.y;
+                // Используем глобальную ось X, скорректированную относительно камеры
+                rotationAxis.set(1, 0, 0);
+                angle = (cameraRight.dot(rotationAxis) > 0) ? delta.y : -delta.y;
+                deltaRotation.fromAxisAngleRad(rotationAxis, (float)Math.toRadians(angle));
                 break;
             case Y:
-                rotationAngles.y += delta.x;
+                rotationAxis.set(0, 1, 0);
+                angle = (cameraUp.dot(rotationAxis) > 0) ? delta.x : -delta.x;
+                deltaRotation.fromAxisAngleRad(rotationAxis, (float)Math.toRadians(angle));
                 break;
             case Z:
-                rotationAngles.z += delta.x;
+                rotationAxis.set(0, 0, 1);
+                angle = (cameraForward.dot(rotationAxis) > 0) ? delta.x : -delta.x;
+                deltaRotation.fromAxisAngleRad(rotationAxis, (float)Math.toRadians(angle));
+                break;
+            case XY:
+                // Для комбинированных вращений создаем два кватерниона и умножаем их
+                Quaternionf xRot = new Quaternionf().fromAxisAngleRad(
+                        new Vector3f(1, 0, 0),
+                        (float)Math.toRadians(delta.y * Math.signum(cameraRight.dot(new Vector3f(1, 0, 0))))
+                );
+                Quaternionf yRot = new Quaternionf().fromAxisAngleRad(
+                        new Vector3f(0, 1, 0),
+                        (float)Math.toRadians(delta.x * Math.signum(cameraUp.dot(new Vector3f(0, 1, 0))))
+                );
+                deltaRotation.set(xRot.mul(yRot));
+                break;
+            // Аналогично для других комбинаций осей (XZ, YZ, XYZ)
+            case XZ:
+                // Комбинированное вращение вокруг осей X и Z
+                Quaternionf xRotXZ = new Quaternionf().fromAxisAngleRad(
+                        new Vector3f(1, 0, 0),
+                        (float)Math.toRadians(delta.y * Math.signum(cameraRight.dot(new Vector3f(1, 0, 0))))
+                );
+                Quaternionf zRotXZ = new Quaternionf().fromAxisAngleRad(
+                        new Vector3f(0, 0, 1),
+                        (float)Math.toRadians(delta.x * Math.signum(cameraForward.dot(new Vector3f(0, 0, 1))))
+                );
+                deltaRotation.set(xRotXZ.mul(zRotXZ));
+                break;
+            case YZ:
+                // Комбинированное вращение вокруг осей Y и Z
+                Quaternionf yRotYZ = new Quaternionf().fromAxisAngleRad(
+                        new Vector3f(0, 1, 0),
+                        (float)Math.toRadians(delta.y * Math.signum(cameraUp.dot(new Vector3f(0, 1, 0))))
+                );
+                Quaternionf zRotYZ = new Quaternionf().fromAxisAngleRad(
+                        new Vector3f(0, 0, 1),
+                        (float)Math.toRadians(delta.x * Math.signum(cameraForward.dot(new Vector3f(0, 0, 1))))
+                );
+                deltaRotation.set(yRotYZ.mul(zRotYZ));
                 break;
             case XYZ:
-                rotationAngles.x += delta.y;
-                rotationAngles.y += delta.x;
+                // Вращение по трем осям с учетом направления камеры
+                Quaternionf xRotXYZ = new Quaternionf().fromAxisAngleRad(
+                        new Vector3f(1, 0, 0),
+                        (float)Math.toRadians(delta.y * Math.signum(cameraRight.dot(new Vector3f(1, 0, 0))))
+                );
+                Quaternionf yRotXYZ = new Quaternionf().fromAxisAngleRad(
+                        new Vector3f(0, 1, 0),
+                        (float)Math.toRadians(delta.x * Math.signum(cameraUp.dot(new Vector3f(0, 1, 0))))
+                );
+                deltaRotation.set(xRotXYZ.mul(yRotXYZ));
                 break;
         }
 
-        // Застосовуємо обертання до вузла
-        selectedNode.setRotation(rotationAngles.x, rotationAngles.y, rotationAngles.z);
+        // Применяем инкрементальное вращение к текущему кватерниону
+        // При умножении справа, вращение происходит в локальной системе координат объекта
+        Quaternionf newRotation = new Quaternionf(currentRotation).mul(deltaRotation);
+        newRotation.normalize(); // Нормализуем для избежания ошибок накопления
+
+        // Обновляем вращение узла
+        applyNewRotation(newRotation);
+
+        // Обновляем визуальные индикаторы вращения
+        updateRotationIndicators();
     }
 
-    /**
-     * Обробляє масштабування об'єкта.
-     */
+    // Вспомогательный метод для применения кватерниона напрямую
+    private void applyNewRotation(Quaternionf rotation) {
+        // Предполагается, что у вас есть доступ к внутреннему кватерниону узла
+        // Это можно либо реализовать через новый метод в классе Node,
+        // либо подстроить под вашу текущую архитектуру
+        selectedNode.setRotationQuaternion(rotation);
+    }
+
+    private void updateRotationIndicators() {
+        // Обновляем позицию индикаторов вращения
+        circleRootNode.setPosition(selectedNode.getPosition().x, selectedNode.getPosition().y, selectedNode.getPosition().z);
+        scaleRootNode.setPosition(selectedNode.getPosition().x, selectedNode.getPosition().y, selectedNode.getPosition().z);
+
+        // Здесь можно также обновить ориентацию кругов вращения, если это необходимо
+        // Например, выровнять их по осям координат с учетом текущего вращения
+    }
+
     private void handleScaling() {
         Vector2f currentMouse = new Vector2f(inputManager.getMouseX(), inputManager.getMouseY());
         Vector2f delta = new Vector2f(currentMouse).sub(startMousePosition);
+
+        Vector3f cameraRight = camera.getRightVector();
+        Vector3f cameraUp = camera.getUpVector();
+        Vector3f cameraForward = camera.getFront();
 
         // Обчислюємо коефіцієнт масштабування
         float scaleFactor = 1.0f + (delta.x + delta.y) * SCALE_SENSITIVITY;
@@ -412,26 +629,18 @@ public class TransformTool implements EditorListener {
         selectedNode.setScale(newScale.x, newScale.y, newScale.z);
     }
 
-    /**
-     * Завершує трансформацію та зберігає результат.
-     */
     private void finishTransform() {
         isDragging = false;
         startMousePosition = null;
         currentAxis = TransformAxis.NONE;
 
-        // Оновлюємо позицію стрілок
+        // Оновлюємо позицію активного інструменту
         if (selectedNode != null) {
-            arrowsRootNode.setPosition(selectedNode.getPosition().x, selectedNode.getPosition().y, selectedNode.getPosition().z);
+            updateToolsVisibility();
         }
 
-        System.out.println("Трансформацію завершено: " +
-                (selectedNode != null ? selectedNode.getName() : "немає вибраного вузла"));
     }
 
-    /**
-     * Скасовує трансформацію та відновлює початковий стан.
-     */
     private void cancelTransform() {
         if (selectedNode == null) return;
 
@@ -447,21 +656,20 @@ public class TransformTool implements EditorListener {
 
         // Оновлюємо позицію стрілок
         arrowsRootNode.setPosition(startPosition.x, startPosition.y, startPosition.z);
+        circleRootNode.setPosition(startPosition.x, startPosition.y, startPosition.z);
+        scaleRootNode.setPosition(startPosition.x, startPosition.y, startPosition.z);
+
 
         isDragging = false;
         startMousePosition = null;
         currentAxis = TransformAxis.NONE;
 
-        System.out.println("Трансформацію скасовано: " + selectedNode.getName());
     }
 
     public boolean isDragging() {
         return isDragging;
     }
 
-    /**
-     * Очищає ресурси при завершенні роботи.
-     */
     public void cleanup() {
         // Очищаємо ресурси, пов'язані з мешами
         if (arrowXMesh != null) {
@@ -474,4 +682,6 @@ public class TransformTool implements EditorListener {
             arrowZMesh.cleanup();
         }
     }
+
+
 }

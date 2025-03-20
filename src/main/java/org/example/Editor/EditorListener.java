@@ -22,4 +22,5 @@ public interface EditorListener {
      * Викликається, коли відбуваються будь-які зміни в сцені.
      */
     void onSceneChanged();
+
 }

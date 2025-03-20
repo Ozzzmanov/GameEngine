@@ -190,4 +190,6 @@ public class NodeTreePanel implements EditorListener {
     public void onSceneChanged() {
         // Оновлення дерева при зміні сцени
     }
+
+
 }

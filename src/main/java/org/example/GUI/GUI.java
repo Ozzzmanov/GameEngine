@@ -7,6 +7,8 @@ import imgui.flag.ImGuiWindowFlags;
 import imgui.gl3.ImGuiImplGl3;
 import imgui.glfw.ImGuiImplGlfw;
 import org.example.Editor.Editor;
+import org.example.Editor.EditorListener;
+import org.example.Editor.TransformTool;
 import org.example.Node;
 
 import java.io.IOException;
@@ -14,16 +16,23 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 
 public class GUI {
     private final ImGuiImplGlfw imGuiGlfw = new ImGuiImplGlfw();
     private final ImGuiImplGl3 imGuiGl3 = new ImGuiImplGl3();
     private long window;
+    private TransformTool transformTool;
 
     // topBar
     private final float topBarHeight = 40; // Храним ширину панели
     private final float topBarButtonHeight = 25;
     private final float topBarButtonWidth = 80;
+
+    // toolBar
+    private final float topToolBarHeight = 60;
+    private int selectedButton = 0; // Режим редагування за замовчуванням 0 = TRANSLATE
 
     // leftBar
     private float leftBarWidth = 350; // Храним ширину панели
@@ -32,13 +41,14 @@ public class GUI {
     private NodeTreePanel nodeTreePanel;
     private NodePropertiesPanel nodePropertiesPanel;
 
-    private Editor editor;
-    private Node rootNode;
+    private float rightPanelWidth = 250;
 
-    public GUI(long window, Editor editor, Node rootNode) {
+    private Editor editor;
+
+    public GUI(long window, Editor editor, Node rootNode, TransformTool transformTool) {
         this.window = window;
         this.editor = editor;
-        this.rootNode = rootNode;
+        this.transformTool = transformTool;
 
         init();
 
@@ -64,7 +74,7 @@ public class GUI {
                 Files.copy(fontStream, tempFont, StandardCopyOption.REPLACE_EXISTING);
 
                 io.getFonts().addFontFromFileTTF(tempFont.toString(), 18, io.getFonts().getGlyphRangesCyrillic());
-                System.out.println("Шрифт успешно загружен");
+
 
                 // Удаление временного файла
                 Files.delete(tempFont);
@@ -83,15 +93,16 @@ public class GUI {
         imGuiGlfw.newFrame();
         ImGui.newFrame();
 
-        renderTopBar();
-        renderLeftBar();
-        renderPropertiesPanel();
+        renderMainTopBar(); // Основна панель
+        renderToolTopBar(); // Панель інструментів
+        renderLeftBar(); // Панель з нодами
+        renderPropertiesPanel(); // Панель з свойствами
 
         ImGui.render();
         imGuiGl3.renderDrawData(ImGui.getDrawData());
     }
 
-    private void renderTopBar() {
+    private void renderMainTopBar() {
         ImGui.setNextWindowPos(0, 0); // Фиксируем позицию окна в верхней части экрана
         ImGui.setNextWindowSize(ImGui.getIO().getDisplaySizeX(), topBarHeight); // Устанавливаем ширину окна = ширине экрана, а высоту = 30
 
@@ -159,6 +170,27 @@ public class GUI {
         ImGui.end();
     }
 
+    private void renderToolTopBar() {
+        ImGui.setNextWindowPos(leftBarWidth, topBarHeight);
+        ImGui.setNextWindowSize(ImGui.getIO().getDisplaySizeX() - leftBarWidth - rightPanelWidth, topToolBarHeight);
+
+        ImGui.begin("Tool", ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize);
+
+
+        // Кнопка TRANSLATE
+        if (ImGui.button("TRANSLATE")) transformTool.setTransformMode(TransformTool.TransformMode.TRANSLATE);
+        ImGui.sameLine();
+        // Кнопка ROTATE
+        if (ImGui.button("ROTATE")) transformTool.setTransformMode(TransformTool.TransformMode.ROTATE);
+        ImGui.sameLine();
+        // Кнопка SCALE
+        if (ImGui.button("SCALE")) transformTool.setTransformMode(TransformTool.TransformMode.SCALE);
+
+
+        ImGui.end();
+    }
+
+
     private void renderLeftBar() {
         ImGui.setNextWindowPos(0, topBarHeight);
         ImGui.setNextWindowSize(leftBarWidth, ImGui.getIO().getDisplaySizeY() - topBarHeight);
@@ -175,7 +207,7 @@ public class GUI {
     }
 
     private void renderPropertiesPanel() {
-        float rightPanelWidth = 250;
+
         ImGui.setNextWindowPos(ImGui.getIO().getDisplaySizeX() - rightPanelWidth, topBarHeight);
         ImGui.setNextWindowSize(rightPanelWidth, ImGui.getIO().getDisplaySizeY() - topBarHeight);
 
@@ -183,6 +215,9 @@ public class GUI {
 
         // Render node properties panel
         nodePropertiesPanel.render(editor.getSelectedNode());
+
+        // Получаем новую ширину окна
+        rightPanelWidth = ImGui.getWindowSizeX();
 
         ImGui.end();
     }
@@ -192,4 +227,7 @@ public class GUI {
         imGuiGlfw.dispose();
         ImGui.destroyContext();
     }
+
+
+
 }
