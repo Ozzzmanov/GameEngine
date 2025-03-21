@@ -36,11 +36,8 @@ public class Core {
     private Camera camera;
     private InputManager inputManager;
     private Node node;
-
     private Grid grid;
-
     private Editor editor;
-
     private TransformTool transformTool;
     private GUI gui;
 
@@ -118,7 +115,7 @@ public class Core {
                     (vidmode.width() - pWidth.get(0)) / 2,
                     (vidmode.height() - pHeight.get(0)) / 2
             );
-        }       
+        }
 
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1); // Включаем вертикальную синхронизацию
@@ -149,23 +146,24 @@ public class Core {
         }
 
 
-
-
         // Создание и настройка камеры
         camera = new Camera(new Vector3f(3.0f, 3.0f, 3.0f), new Vector3f(0.0f, 1.0f, 0.0f), -135.0f, -30.0f);
         inputManager = new InputManager(window, camera);
 
         // Загрузка моделей и настройка материалов
-        Mesh gold = ImportObj.loadObjModel("/Object/gold.obj");
+        Mesh gold = ObjectLoader.loadObjModel("/Object/Models/gold.obj");
         gold.setShaderMaterial(ShaderMaterial.createGold()); // Применяем золотой материал к кубу
 
-        Mesh sphereMesh = ImportObj.loadObjModel("/Object/sphere.obj");
+        Mesh sphereMesh = ObjectLoader.loadObjModel("/Object/Primitives/sphere.obj");
         sphereMesh.setShaderMaterial(ShaderMaterial.createSilver());
 
-        Mesh cubes = ImportObj.loadObjModel("/Object/cube.obj");
-        cubes.setShaderMaterial(ShaderMaterial.createSilver());
+        Mesh cubes = ObjectLoader.loadObjModel("/Object/Primitives/cube.obj");
+        cubes.setShaderMaterial(ShaderMaterial.createTexturedMaterial("/Textures/wood_01.png"));
 
-        Mesh sun = ImportObj.loadObjModel("/Object/sphere.obj");
+        Mesh barrel = ObjectLoader.loadObjModel("/Object/Models/barrel.obj");
+        barrel.setShaderMaterial(ShaderMaterial.createTexturedMaterial("/Textures/barrel/Barrel_BaseColor.jpg"));
+
+        Mesh sun = ObjectLoader.loadObjModel("/Object/Primitives/sphere.obj");
 
         node = new Node("rootNode");
             Node meshNode = new Node("meshNode");
@@ -175,8 +173,11 @@ public class Core {
                 Node goldNode = new Node("goldNode");
                     goldNode.addMesh(gold);
                     goldNode.setPosition(4,0,4);
-                Node sphere = new Node("sphereNode");
-                    sphere.addMesh(sphereMesh);
+                Node sphereNode = new Node("sphereNode");
+                    sphereNode.addMesh(sphereMesh);
+                Node barrelNode = new Node("barrelNode");
+                    barrelNode.addMesh(barrel);
+                    barrelNode.setPosition(-2,0,-2);
             Node lightNode = new Node("lightNode");
                 lightNode.addMesh(sun);
                 lightNode.setPosition(5,5,5);
@@ -184,7 +185,8 @@ public class Core {
         node.addChild(meshNode);
             meshNode.addChild(cubeNode);
             meshNode.addChild(goldNode);
-            meshNode.addChild(sphere);
+            meshNode.addChild(barrelNode);
+            meshNode.addChild(sphereNode);
         node.addChild(lightNode);
 
 
@@ -210,6 +212,9 @@ public class Core {
             // Обновляем контроллер ввода
             inputManager.update();
 
+            // Позиція камери вектор
+            Vector3f cameraPosition = camera.getPosition();
+
             // Получаем матрицы вида и проекции от камеры и вьюпорта
             Matrix4f viewMatrix = camera.getViewMatrix();
             Matrix4f projectionMatrix = viewport.getProjectionMatrix();
@@ -217,7 +222,7 @@ public class Core {
             for (Node child : node.getChildren()) {
                 switch (child.getName()) {
                     case "meshNode":
-                        child.render(mainShaderProgram, viewMatrix, projectionMatrix);
+                        child.render(mainShaderProgram, viewMatrix, projectionMatrix, cameraPosition);
                         break;
                     case "lightNode":
                         child.renderLight(lightShaderProgram, viewMatrix, projectionMatrix);

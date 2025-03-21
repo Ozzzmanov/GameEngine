@@ -4,7 +4,7 @@ import imgui.ImGui;
 import imgui.type.ImFloat;
 import imgui.type.ImString;
 import org.example.Editor.Editor;
-import org.example.ImportObj;
+import org.example.ObjectLoader;
 import org.example.Mesh;
 import org.example.Node;
 import org.example.ShaderMaterial;
@@ -35,9 +35,11 @@ public class NodePropertiesPanel {
 
         // Ініціалізація списку доступних моделей
         this.availableMeshes = new ArrayList<>();
-        this.availableMeshes.add("/Object/cube.obj");
-        this.availableMeshes.add("/Object/sphere.obj");
-        this.availableMeshes.add("/Object/gold.obj");
+        this.availableMeshes.add("/Object/Primitives/cube.obj");
+        this.availableMeshes.add("/Object/Primitives/sphere.obj");
+        this.availableMeshes.add("/Object/Models/gold.obj");
+        this.availableMeshes.add("/Object/Primitives/Con.obj");
+        this.availableMeshes.add("/Object/Primitives/SphereHighPoly.obj");
     }
 
     public void render(Node selectedNode) {
@@ -111,7 +113,7 @@ public class NodePropertiesPanel {
                 ImGui.text("Доступні моделі:");
                 for (String meshPath : availableMeshes) {
                     if (ImGui.selectable(meshPath)) {
-                        Mesh mesh = ImportObj.loadObjModel(meshPath);
+                        Mesh mesh = ObjectLoader.loadObjModel(meshPath);
                         selectedNode.addMesh(mesh);
                         editor.notifySceneChanged();
                         editor.registerNodeForPicking(selectedNode);

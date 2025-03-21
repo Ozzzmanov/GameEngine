@@ -25,9 +25,9 @@ public class NodeTreePanel implements EditorListener {
 
         // Ініціалізація списку доступних моделей
         this.availableMeshes = new ArrayList<>();
-        this.availableMeshes.add("/Object/cube.obj");
-        this.availableMeshes.add("/Object/sphere.obj");
-        this.availableMeshes.add("/Object/gold.obj");
+        this.availableMeshes.add("/Object/Primitives/cube.obj");
+        this.availableMeshes.add("/Object/Primitives/sphere.obj");
+        this.availableMeshes.add("/Object/Models/gold.obj");
         // Додавайте більше шляхів до моделей за потреби
     }
 

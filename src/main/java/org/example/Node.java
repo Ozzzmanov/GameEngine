@@ -101,15 +101,15 @@ public class Node {
         return new Matrix4f(worldTransformation);
     }
 
-    public void render(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+    public void render(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix, Vector3f cameraPosition) {
         updateWorldTransformation();
 
         for (Mesh mesh : meshes) {
-            mesh.render(shaderProgram, viewMatrix, projectionMatrix);
+            mesh.render(shaderProgram, viewMatrix, projectionMatrix, cameraPosition);
         }
 
         for (Node child : children) {
-            child.render(shaderProgram, viewMatrix, projectionMatrix);
+            child.render(shaderProgram, viewMatrix, projectionMatrix, cameraPosition);
         }
     }
 
@@ -187,6 +187,12 @@ public class Node {
 
     public void setScale(float x, float y, float z) {
         scale.set(x, y, z);
+        localTransformationDirty = true;
+        notifyNodeChanged();
+    }
+
+    public void setScale(Vector3f vector3f) {
+        scale.set(vector3f.x, vector3f.y, vector3f.z);
         localTransformationDirty = true;
         notifyNodeChanged();
     }

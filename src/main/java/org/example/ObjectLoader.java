@@ -1,5 +1,6 @@
 package org.example;
 
+import org.joml.Vector2f;
 import org.joml.Vector3f;
 
 import java.io.BufferedReader;
@@ -9,16 +10,17 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ImportObj {
+public class ObjectLoader {
 
     public static Mesh loadObjModel(String resourcePath) {
         List<Vector3f> positions = new ArrayList<>();
         List<Vector3f> normals = new ArrayList<>();
         List<Integer> indices = new ArrayList<>();
+        List<Vector2f> texCoords = new ArrayList<>();
 
         try {
             // Загрузка из ресурсов
-            InputStream inputStream = ImportObj.class.getResourceAsStream(resourcePath);
+            InputStream inputStream = ObjectLoader.class.getResourceAsStream(resourcePath);
             if (inputStream == null) {
                 throw new IOException("Не удалось найти ресурс: " + resourcePath);
             }
@@ -46,6 +48,12 @@ public class ImportObj {
                         Vector3f normal = new Vector3f(nx, ny, nz).normalize(); // Нормализуем сразу
                         normals.add(normal);
                     }
+                    // Текстурні координати
+                    else if (parts[0].equals("vt") && parts.length >= 3) {
+                        float u = Float.parseFloat(parts[1]);
+                        float v = Float.parseFloat(parts[2]);
+                        texCoords.add(new Vector2f(u, v));
+                    }
                 }
             }
 
@@ -62,12 +70,13 @@ public class ImportObj {
 
             // Сбрасываем поток и начинаем второй проход
             reader.close();
-            inputStream = ImportObj.class.getResourceAsStream(resourcePath);
+            inputStream = ObjectLoader.class.getResourceAsStream(resourcePath);
             reader = new BufferedReader(new InputStreamReader(inputStream));
 
             // Хранит уникальные комбинации вершин и их нормалей
             List<Vector3f> finalPositions = new ArrayList<>();
             List<Vector3f> finalNormals = new ArrayList<>();
+            List<Vector2f> finalTexCoords = new ArrayList<>(); // Добавляем хранилище текстурных координат
 
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split("\\s+");
@@ -77,11 +86,19 @@ public class ImportObj {
 
                     int[] vertIndices = new int[parts.length - 1];
                     int[] normIndices = new int[parts.length - 1];
+                    int[] texIndices = new int[parts.length - 1]; // Текстурні
 
                     // Получаем индексы вершин и нормалей
                     for (int i = 1; i < parts.length; i++) {
                         String[] elements = parts[i].split("/");
                         vertIndices[i-1] = Integer.parseInt(elements[0]) - 1; // OBJ индексы с 1
+
+                        // Проверяем текстурные координаты
+                        if (elements.length >= 2 && !elements[1].isEmpty()) {
+                            texIndices[i-1] = Integer.parseInt(elements[1]) - 1;
+                        } else {
+                            texIndices[i-1] = -1; // Нет текстурных координат
+                        }
 
                         if (hasNormals && elements.length >= 3 && !elements[2].isEmpty()) {
                             normIndices[i-1] = Integer.parseInt(elements[2]) - 1;
@@ -108,32 +125,45 @@ public class ImportObj {
 
                     // Триангуляция и создание уникальных вершин
                     for (int i = 1; i < vertIndices.length - 1; i++) {
-                        addVertex(vertIndices[0], normIndices[0], positions, hasNormals ? normals : null,
-                                tempNormals, hasNormals, finalPositions, finalNormals, indices);
-                        addVertex(vertIndices[i], normIndices[i], positions, hasNormals ? normals : null,
-                                tempNormals, hasNormals, finalPositions, finalNormals, indices);
-                        addVertex(vertIndices[i+1], normIndices[i+1], positions, hasNormals ? normals : null,
-                                tempNormals, hasNormals, finalPositions, finalNormals, indices);
+                        addVertex(vertIndices[0], normIndices[0], texIndices[0],
+                                positions, hasNormals ? normals : null, texCoords,
+                                tempNormals, hasNormals, finalPositions, finalNormals,
+                                finalTexCoords, indices);
+
+                        addVertex(vertIndices[i], normIndices[i], texIndices[i],
+                                positions, hasNormals ? normals : null, texCoords,
+                                tempNormals, hasNormals, finalPositions, finalNormals,
+                                finalTexCoords, indices);
+
+                        addVertex(vertIndices[i+1], normIndices[i+1], texIndices[i+1],
+                                positions, hasNormals ? normals : null, texCoords,
+                                tempNormals, hasNormals, finalPositions, finalNormals,
+                                finalTexCoords, indices);
                     }
                 }
             }
 
             // Создаем финальный массив вершинных данных
-            float[] verticesArray = new float[finalPositions.size() * 6]; // xyz + normal xyz
+            float[] verticesArray = new float[finalPositions.size() * 8]; // xyz + uv + normal xyz
 
             for (int i = 0; i < finalPositions.size(); i++) {
                 Vector3f pos = finalPositions.get(i);
+                Vector2f tex = finalTexCoords.get(i);
                 Vector3f norm = finalNormals.get(i);
 
-                // Позиция
-                verticesArray[i * 6] = pos.x;
-                verticesArray[i * 6 + 1] = pos.y;
-                verticesArray[i * 6 + 2] = pos.z;
+                // Позиція
+                verticesArray[i * 8] = pos.x;
+                verticesArray[i * 8 + 1] = pos.y;
+                verticesArray[i * 8 + 2] = pos.z;
+
+                // Текстурні координати
+                verticesArray[i * 8 + 3] = tex.x;
+                verticesArray[i * 8 + 4] = tex.y;
 
                 // Нормаль
-                verticesArray[i * 6 + 3] = norm.x;
-                verticesArray[i * 6 + 4] = norm.y;
-                verticesArray[i * 6 + 5] = norm.z;
+                verticesArray[i * 8 + 5] = norm.x;
+                verticesArray[i * 8 + 6] = norm.y;
+                verticesArray[i * 8 + 7] = norm.z;
             }
 
             // Преобразуем индексы
@@ -156,13 +186,16 @@ public class ImportObj {
         }
     }
 
-    // Вспомогательный метод для добавления вершины
-    private static void addVertex(int posIndex, int normIndex, List<Vector3f> positions,
-                                  List<Vector3f> normals, Vector3f[] tempNormals,
+    // Вспомогательный метод для добавления вершины (обновленный для поддержки текстур)
+    private static void addVertex(int posIndex, int normIndex, int texIndex,
+                                  List<Vector3f> positions, List<Vector3f> normals,
+                                  List<Vector2f> texCoords, Vector3f[] tempNormals,
                                   boolean hasNormals, List<Vector3f> finalPositions,
-                                  List<Vector3f> finalNormals, List<Integer> indices) {
+                                  List<Vector3f> finalNormals, List<Vector2f> finalTexCoords,
+                                  List<Integer> indices) {
         Vector3f position = positions.get(posIndex);
         Vector3f normal;
+        Vector2f texCoord;
 
         if (hasNormals && normIndex >= 0) {
             normal = new Vector3f(normals.get(normIndex));
@@ -172,9 +205,17 @@ public class ImportObj {
             normal = new Vector3f(0, 1, 0); // Запасной вариант
         }
 
+        // Получаем текстурные координаты или используем дефолтные, если их нет
+        if (texIndex >= 0 && texIndex < texCoords.size()) {
+            texCoord = new Vector2f(texCoords.get(texIndex));
+        } else {
+            texCoord = new Vector2f(0, 0); // Дефолтные текстурные координаты
+        }
+
         // Добавляем вершину и получаем её индекс
         finalPositions.add(new Vector3f(position));
         finalNormals.add(new Vector3f(normal));
+        finalTexCoords.add(new Vector2f(texCoord));
         indices.add(finalPositions.size() - 1);
     }
 }

@@ -6,13 +6,12 @@ import org.joml.Vector2f;
 import org.joml.Vector3f;
 
 import java.io.IOException;
-import java.util.AbstractMap;
 
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
 import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
 
 import java.util.Map;
-import java.util.AbstractMap.SimpleEntry;
+
 /**
  * Інструмент трансформації для сцени редактора.
  * Дозволяє переміщати, обертати та масштабувати вибрані об'єкти.
@@ -61,8 +60,7 @@ public class TransformTool implements EditorListener {
     private Node arrowXNode;
     private Node arrowYNode;
     private Node arrowZNode;
-    private Node arrowsRootNode; // Корневий вузол для всіх стрілок
-
+    private Node arrowsRootNode;
 
     // Меші для кутів ейлера
     private Mesh circleYawMesh;
@@ -132,9 +130,9 @@ public class TransformTool implements EditorListener {
         arrowsRootNode = new Node("arrowsRootNode");
 
         // Завантажуємо меш стрілки
-        arrowXMesh = ImportObj.loadObjModel("/Object/Tools/Arrow/ArrowMeshX.obj");
-        arrowYMesh = ImportObj.loadObjModel("/Object/Tools/Arrow/ArrowMeshY.obj");
-        arrowZMesh = ImportObj.loadObjModel("/Object/Tools/Arrow/ArrowMeshZ.obj");
+        arrowXMesh = ObjectLoader.loadObjModel("/Object/Tools/Arrow/ArrowMeshX.obj");
+        arrowYMesh = ObjectLoader.loadObjModel("/Object/Tools/Arrow/ArrowMeshY.obj");
+        arrowZMesh = ObjectLoader.loadObjModel("/Object/Tools/Arrow/ArrowMeshZ.obj");
 
         // Встановлюємо матеріали для стрілок (червоний, зелений, синій)
         arrowXMesh.setShaderMaterial(ShaderMaterial.createRed());
@@ -167,9 +165,9 @@ public class TransformTool implements EditorListener {
         circleRootNode = new Node("circleRootNode");
 
         // Завантажуємо меш кутів ейлера
-        circleYawMesh = ImportObj.loadObjModel("/Object/Tools/Circle/CircleMeshYaw.obj");
-        circlePitchMesh = ImportObj.loadObjModel("/Object/Tools/Circle/CircleMeshPitch.obj");
-        circleRollMesh = ImportObj.loadObjModel("/Object/Tools/Circle/CircleMeshRoll.obj");
+        circleYawMesh = ObjectLoader.loadObjModel("/Object/Tools/Circle/CircleMeshYaw.obj");
+        circlePitchMesh = ObjectLoader.loadObjModel("/Object/Tools/Circle/CircleMeshPitch.obj");
+        circleRollMesh = ObjectLoader.loadObjModel("/Object/Tools/Circle/CircleMeshRoll.obj");
 
         // Встановлюємо матеріали для кутів ейлера (червоний, зелений, синій)
         circleYawMesh.setShaderMaterial(ShaderMaterial.createRed());
@@ -202,9 +200,9 @@ public class TransformTool implements EditorListener {
         scaleRootNode = new Node("scaleRootNode");
 
         // Завантажуємо меш векторів scale
-        vectorXScaleMesh = ImportObj.loadObjModel("/Object/Tools/scaleVector/scaleVectorX.obj");
-        vectorYScaleMesh = ImportObj.loadObjModel("/Object/Tools/scaleVector/scaleVectorY.obj");
-        vectorZScaleMesh = ImportObj.loadObjModel("/Object/Tools/scaleVector/scaleVectorZ.obj");
+        vectorXScaleMesh = ObjectLoader.loadObjModel("/Object/Tools/scaleVector/scaleVectorX.obj");
+        vectorYScaleMesh = ObjectLoader.loadObjModel("/Object/Tools/scaleVector/scaleVectorY.obj");
+        vectorZScaleMesh = ObjectLoader.loadObjModel("/Object/Tools/scaleVector/scaleVectorZ.obj");
 
         // Встановлюємо матеріали
         vectorXScaleMesh.setShaderMaterial(ShaderMaterial.createRed());
@@ -333,18 +331,20 @@ public class TransformTool implements EditorListener {
         if (inputManager.isKeyDown(GLFW_KEY_ESCAPE)) {
             cancelTransform();
         }
+        Vector3f cameraPosition = camera.getPosition();
 
         // Рендеримо тільки активний інструмент трансформації, якщо є вибраний вузол
         if (selectedNode != null && !isDragging) {
+            Vector3f offset = new Vector3f(1.5f,1.5f,1.5f);
             switch (currentMode) {
                 case TRANSLATE:
-                    arrowsRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix());
+                    arrowsRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix(), cameraPosition);
                     break;
                 case ROTATE:
-                    circleRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix());
+                    circleRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix(), cameraPosition);
                     break;
                 case SCALE:
-                    scaleRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix());
+                    scaleRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix(), cameraPosition);
                     break;
             }
         }
@@ -362,8 +362,11 @@ public class TransformTool implements EditorListener {
     private void updateToolsVisibility() {
         if (selectedNode == null) return;
 
-        float scale = 2.5f;
         Vector3f position = selectedNode.getPosition();
+        Vector3f scaleNode = selectedNode.getScale();
+        float sumScale = (scaleNode.x + scaleNode.y + scaleNode.z) * 1.1f; // сумма scale
+
+        System.out.println(scaleNode);
 
         // Ховаємо всі інструменти спочатку
         arrowsRootNode.setScale(0, 0, 0);
@@ -374,15 +377,15 @@ public class TransformTool implements EditorListener {
         switch (currentMode) {
             case TRANSLATE:
                 arrowsRootNode.setPosition(position.x, position.y, position.z);
-                arrowsRootNode.setScale(scale, scale, scale);
+                arrowsRootNode.setScale(sumScale,sumScale,sumScale);
                 break;
             case ROTATE:
                 circleRootNode.setPosition(position.x, position.y, position.z);
-                circleRootNode.setScale(scale, scale, scale);
+                circleRootNode.setScale(sumScale,sumScale,sumScale);
                 break;
             case SCALE:
                 scaleRootNode.setPosition(position.x, position.y, position.z);
-                scaleRootNode.setScale(scale, scale, scale);
+                scaleRootNode.setScale(sumScale,sumScale,sumScale);
                 break;
         }
     }
@@ -577,8 +580,6 @@ public class TransformTool implements EditorListener {
     private void updateRotationIndicators() {
         // Обновляем позицию индикаторов вращения
         circleRootNode.setPosition(selectedNode.getPosition().x, selectedNode.getPosition().y, selectedNode.getPosition().z);
-        scaleRootNode.setPosition(selectedNode.getPosition().x, selectedNode.getPosition().y, selectedNode.getPosition().z);
-
         // Здесь можно также обновить ориентацию кругов вращения, если это необходимо
         // Например, выровнять их по осям координат с учетом текущего вращения
     }
