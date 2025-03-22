@@ -28,7 +28,7 @@ public class ObjectLoader {
             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
             String line;
 
-            // Первый проход - чтение всех вершин и нормалей
+            // Первый проход - чтение всех вершин и нормалей c текстурами
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split("\\s+");
 

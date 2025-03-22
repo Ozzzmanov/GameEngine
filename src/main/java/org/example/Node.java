@@ -33,6 +33,15 @@ public class Node {
     // События
     private final List<NodeListener> listeners;
 
+    private NodeType nodeType = NodeType.DEFAULT;
+    public enum NodeType {
+        DEFAULT,
+        LIGHT
+    }
+
+    private Vector3f lightColor = new Vector3f(1.0f, 1.0f, 1.0f); // Белый цвет
+    private float lightIntensity = 1.0f;
+
     public Node(String name) {
         this.id = UUID.randomUUID();
         this.name = name;
@@ -48,6 +57,8 @@ public class Node {
         this.worldTransformation = new Matrix4f();
         this.localTransformationDirty = true;
         this.selected = false;
+
+
     }
 
     // Добавление компонента к узлу
@@ -104,13 +115,27 @@ public class Node {
     public void render(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix, Vector3f cameraPosition) {
         updateWorldTransformation();
 
+        // Получаем все источники света в сцене
+        List<Node> lightNodes = getRootNode().getLightNodes();
+
         for (Mesh mesh : meshes) {
-            mesh.render(shaderProgram, viewMatrix, projectionMatrix, cameraPosition);
+            mesh.render(shaderProgram, viewMatrix, projectionMatrix, cameraPosition, lightNodes);
         }
 
         for (Node child : children) {
-            child.render(shaderProgram, viewMatrix, projectionMatrix, cameraPosition);
+            if (child.getNodeType() != NodeType.LIGHT) { // Не рендерим ноды света через обычный шейдер
+                child.render(shaderProgram, viewMatrix, projectionMatrix, cameraPosition);
+            }
         }
+    }
+
+    // Вспомогательный метод для получения корневого узла
+    private Node getRootNode() {
+        Node current = this;
+        while (current.getParent() != null) {
+            current = current.getParent();
+        }
+        return current;
     }
 
     public void renderLight(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
@@ -273,6 +298,39 @@ public class Node {
         }
     }
 
+    public List<Node> getLightNodes() {
+        List<Node> lightNodes = new ArrayList<>();
+        collectLightNodes(lightNodes);
+        return lightNodes;
+    }
+
+    private void collectLightNodes(List<Node> nodes) {
+        if (this.nodeType == NodeType.LIGHT) {
+            nodes.add(this);
+        }
+        for (Node child : children) {
+            child.collectLightNodes(nodes);
+        }
+    }
+
+    public void setLightColor(float r, float g, float b) {
+        this.lightColor.set(r, g, b);
+        notifyNodeChanged();
+    }
+
+    public Vector3f getLightColor() {
+        return new Vector3f(lightColor);
+    }
+
+    public void setLightIntensity(float intensity) {
+        this.lightIntensity = intensity;
+        notifyNodeChanged();
+    }
+
+    public float getLightIntensity() {
+        return lightIntensity;
+    }
+
     // Геттеры
     public UUID getId() {
         return id;
@@ -330,5 +388,13 @@ public class Node {
                 "id=" + id +
                 ", name='" + name + '\'' +
                 '}';
+    }
+
+    public NodeType getNodeType() {
+        return nodeType;
+    }
+
+    public void setNodeType(NodeType nodeType) {
+        this.nodeType = nodeType;
     }
 }

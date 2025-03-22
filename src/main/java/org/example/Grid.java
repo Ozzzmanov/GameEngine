@@ -1,6 +1,7 @@
 package org.example;
 
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.FloatBuffer;
@@ -260,12 +261,25 @@ public class Grid {
             // Передаємо матрицю MVP в шейдер
             glUniformMatrix4fv(mvpLoc, false, mvpBuffer);
 
+            // Встановлюємо власні значення матеріалу для сітки
+            int ambientLoc = glGetUniformLocation(shaderProgram, "material.ambient");
+            int diffuseLoc = glGetUniformLocation(shaderProgram, "material.diffuse");
+            int specularLoc = glGetUniformLocation(shaderProgram, "material.specular");
+            int shininessLoc = glGetUniformLocation(shaderProgram, "material.shininess");
+
+            // Встановлюємо значення за замовчуванням для матеріалу сітки
+            glUniform3f(ambientLoc, 0.5f, 0.5f, 0.5f);
+            glUniform3f(diffuseLoc, 0.5f, 0.5f, 0.5f);
+            glUniform3f(specularLoc, 0.0f, 0.0f, 0.0f);
+            glUniform1f(shininessLoc, 1.0f);
+
             // Малюємо сітку
             glBindVertexArray(gridVAO);
 
             // Встановлюємо колір для сітки через uniform lightColor
             int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-            glUniform3f(lightColorLoc, 0.6f, 0.6f, 0.6f); // Сірий колір для сітки
+            glUniform3f(lightColorLoc, 0.3f, 0.3f, 0.3f);
+
 
             glLineWidth(1.0f);
             glDrawElements(GL_LINES, gridVertexCount, GL_UNSIGNED_INT, 0);

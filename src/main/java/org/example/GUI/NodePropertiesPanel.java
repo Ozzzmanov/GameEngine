@@ -3,21 +3,17 @@ package org.example.GUI;
 import imgui.ImGui;
 import imgui.type.ImFloat;
 import imgui.type.ImString;
+import org.example.*;
 import org.example.Editor.Editor;
-import org.example.ObjectLoader;
-import org.example.Mesh;
-import org.example.Node;
-import org.example.ShaderMaterial;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class NodePropertiesPanel {
+public class NodePropertiesPanel extends AbstractPanel {
     private Editor editor;
     private List<String> availableMeshes;
-
     private ImString nodeName = new ImString(64);
     private Vector3f position = new Vector3f(0, 0, 0);
     private Vector3f rotation = new Vector3f(0, 0, 0);
@@ -29,8 +25,12 @@ public class NodePropertiesPanel {
     private Vector3f specular = new Vector3f(1.0f, 1.0f, 1.0f);
     private ImFloat shininess = new ImFloat(32.0f);
 
+    // Текстури
+    private TextureLoader diffuseMap;
+    private List<String> availableTextures;
 
-    public NodePropertiesPanel(Editor editor) {
+    public NodePropertiesPanel(float posX, float posY, float width, float height, Editor editor) {
+        super("Properties", posX, posY, width, height);
         this.editor = editor;
 
         // Ініціалізація списку доступних моделей
@@ -40,9 +40,18 @@ public class NodePropertiesPanel {
         this.availableMeshes.add("/Object/Models/gold.obj");
         this.availableMeshes.add("/Object/Primitives/Con.obj");
         this.availableMeshes.add("/Object/Primitives/SphereHighPoly.obj");
+
+        // Ініціалізація списку доступних текстур
+        this.availableTextures = new ArrayList<>();
+        this.availableTextures.add("/Textures/primitivesPack/wood_01.png");
+        this.availableTextures.add("/Textures/primitivesPack/metal_01.png");
+        this.availableTextures.add("/Textures/primitivesPack/brick_01.png");
     }
 
-    public void render(Node selectedNode) {
+    @Override
+    protected void renderContent() {
+        Node selectedNode = editor.getSelectedNode();
+
         if (selectedNode == null) {
             ImGui.text("No node selected");
             return;
@@ -103,7 +112,8 @@ public class NodePropertiesPanel {
             ImGui.separator();
             // Додавання моделі до вибраного вузла
             ImGui.sameLine();
-            if (ImGui.button("Додати модель", 100, 25)) {
+            ImGui.spacing();
+            if (ImGui.button("Додати модель", 125, 25)) {
                 if (selectedNode != null) {
                     ImGui.openPopup("AddMeshPopup");
                 }
@@ -114,6 +124,7 @@ public class NodePropertiesPanel {
                 for (String meshPath : availableMeshes) {
                     if (ImGui.selectable(meshPath)) {
                         Mesh mesh = ObjectLoader.loadObjModel(meshPath);
+                        mesh.setShaderMaterial(ShaderMaterial.createSilver());
                         selectedNode.addMesh(mesh);
                         editor.notifySceneChanged();
                         editor.registerNodeForPicking(selectedNode);
@@ -156,64 +167,128 @@ public class NodePropertiesPanel {
     }
 
     private void renderMeshProperties(Mesh mesh) {
-        // Властивості матеріалу
-        if (mesh.getShaderMaterial() != null) {
-            ShaderMaterial material = mesh.getShaderMaterial();
+        if (ImGui.treeNode("Material")) {
+            // Властивості матеріалу
+            if (mesh.getShaderMaterial() != null) {
+                ShaderMaterial material = mesh.getShaderMaterial();
 
-            // Оновлюємо значення матеріалу в UI
-            updateMaterialUIValues(material);
+                // Оновлюємо значення матеріалу в UI
+                updateMaterialUIValues(material);
 
-            ImGui.text("Material:");
+                ImGui.text("Material:");
 
-            // Колір ambient
-            ImGui.text("Ambient:");
-            float[] ambArr = {ambient.x, ambient.y, ambient.z};
-            if (ImGui.colorEdit3("##Ambient", ambArr)) {
-                ambient.set(ambArr);
-                material.setAmbient(ambient);
+                // Колір ambient
+                ImGui.text("Ambient:");
+                float[] ambArr = {ambient.x, ambient.y, ambient.z};
+                if (ImGui.colorEdit3("##Ambient", ambArr)) {
+                    ambient.set(ambArr);
+                    material.setAmbient(new Vector3f(ambient));
+                }
+
+                // Колір diffuse
+                ImGui.text("Diffuse:");
+                float[] diffArr = {diffuse.x, diffuse.y, diffuse.z};
+                if (ImGui.colorEdit3("##Diffuse", diffArr)) {
+                    diffuse.set(diffArr);
+                    material.setDiffuse(new Vector3f(diffuse));
+                }
+
+                // Колір specular
+                ImGui.text("Specular:");
+                float[] specArr = {specular.x, specular.y, specular.z};
+                if (ImGui.colorEdit3("##Specular", specArr)) {
+                    specular.set(specArr);
+                    material.setSpecular(new Vector3f(specular));
+                }
+
+                // Яскравість
+                ImGui.text("Shininess:");
+                float[] shininessArr = {shininess.get()};
+                if (ImGui.dragFloat("##Shininess", shininessArr, 1.0f, 1.0f, 256.0f)) {
+                    shininess.set(shininessArr[0]);
+                    material.setShininess(shininess.get());
+                }
+
+                // Швидкі налаштування матеріалів
+                ImGui.text("Presets:");
+                if (ImGui.button("Gold", 60, 25)) {
+                    mesh.setShaderMaterial(ShaderMaterial.createGold());
+                    updateMaterialUIValues(mesh.getShaderMaterial());
+                }
+                ImGui.sameLine();
+                if (ImGui.button("Silver", 60, 25)) {
+                    mesh.setShaderMaterial(ShaderMaterial.createSilver());
+                    updateMaterialUIValues(mesh.getShaderMaterial());
+                }
+                ImGui.sameLine();
+                if (ImGui.button("Holographic", 60, 25)) {
+                    mesh.setShaderMaterial(ShaderMaterial.createHolographicMaterial());
+                    updateMaterialUIValues(mesh.getShaderMaterial());
+                }
+            } else {
+                ImGui.text("Відсутній матеріал");
             }
 
-            // Колір diffuse
-            ImGui.text("Diffuse:");
-            float[] diffArr = {diffuse.x, diffuse.y, diffuse.z};
-            if (ImGui.colorEdit3("##Diffuse", diffArr)) {
-                diffuse.set(diffArr);
-                material.setDiffuse(diffuse);
-            }
+            ImGui.treePop();
 
-            // Колір specular
-            ImGui.text("Specular:");
-            float[] specArr = {specular.x, specular.y, specular.z};
-            if (ImGui.colorEdit3("##Specular", specArr)) {
-                specular.set(specArr);
-                material.setSpecular(specular);
-            }
-
-            // Яскравість
-            ImGui.text("Shininess:");
-            if (ImGui.dragFloat("##Shininess", new float[]{shininess.get()}, 1.0f, 1.0f, 256.0f)) {
-                material.setShininess(shininess.get());
-            }
-
-            // Швидкі налаштування матеріалів
-            ImGui.text("Presets:");
-            if (ImGui.button("Gold", 60, 25)) {
-                mesh.setShaderMaterial(ShaderMaterial.createGold());
-                updateMaterialUIValues(mesh.getShaderMaterial());
-            }
-            ImGui.sameLine();
-            if (ImGui.button("Silver", 60, 25)) {
-                mesh.setShaderMaterial(ShaderMaterial.createSilver());
-                updateMaterialUIValues(mesh.getShaderMaterial());
-            }
-            ImGui.sameLine();
-            if (ImGui.button("Holographic", 60, 25)) {
-                mesh.setShaderMaterial(ShaderMaterial.createHolographicMaterial());
-                updateMaterialUIValues(mesh.getShaderMaterial());
-            }
-        } else {
-            ImGui.text("No material assigned");
         }
+        if (ImGui.treeNode("Texture")) {
+            if (mesh.getShaderMaterial() != null) {
+                ShaderMaterial material = mesh.getShaderMaterial();
+
+                updateMaterialUIValues(material);
+
+                ImGui.text("Textures");
+
+                ImGui.sameLine();
+                ImGui.spacing();
+                if (ImGui.button("Додати текстуру", 125, 25)) {
+                    ImGui.openPopup("AddTexturePopup");
+                }
+
+                if (ImGui.beginPopup("AddTexturePopup")) {
+                    ImGui.text("Доступні текстури:");
+                    for (String texturePath : availableTextures) {
+                        if (ImGui.selectable(texturePath)) {
+                            material.setDiffuseMapPath(texturePath);
+                            updateMaterialUIValues(material);
+                            editor.notifySceneChanged();
+                            ImGui.closeCurrentPopup();
+                        }
+                    }
+                    ImGui.endPopup();
+                }
+
+                if (diffuseMap != null) {
+                    ImGui.text("Texture id: " + diffuseMap.getId());
+                    ImGui.text("Розмір: " + diffuseMap.getWidth() + "x" + diffuseMap.getHeight());
+
+                    // Додавання кнопки видалення текстури
+                    if (ImGui.button("Видалити текстуру", 125, 25)) {
+                        material.setDiffuseMap(null);
+                        diffuseMap = null;
+                        editor.notifySceneChanged();
+                    }
+
+                    // Додаткові параметри текстури
+                    if (ImGui.collapsingHeader("Налаштування текстури")) {
+                        ImGui.text("Додаткові параметри текстури будуть тут");
+                        // - Масштабування текстури
+                        // - Зміщення текстури
+                        // - Фільтрація
+                    }
+                } else {
+                    ImGui.text("Відсутня текстура");
+                }
+            } else {
+                ImGui.text("Відсутній матеріал");
+            }
+
+            ImGui.treePop();
+        }
+
+
+
     }
 
     private void updateUIValues(Node node) {
@@ -235,20 +310,28 @@ public class NodePropertiesPanel {
     }
 
     private void updateMaterialUIValues(ShaderMaterial material) {
-        // Оновлюємо колір ambient
+
+        // Обновляем цвет ambient
         Vector3f amb = material.getAmbient();
-        ambient.set(amb);
+        ambient = new Vector3f(amb.x, amb.y, amb.z);
 
-        // Оновлюємо колір diffuse
+        // Обновляем цвет diffuse
         Vector3f diff = material.getDiffuse();
-        diffuse.set(diff);
+        diffuse = new Vector3f(diff.x, diff.y, diff.z);
 
-        // Оновлюємо колір specular
+        // Обновляем цвет specular
         Vector3f spec = material.getSpecular();
-        specular.set(spec);
+        specular = new Vector3f(spec.x, spec.y, spec.z);
 
-        // Оновлюємо яскравість
+        // Обновляем яркость
         shininess.set(material.getShininess());
+
+        // Обновляем текстуры
+        if(material.hasTexture()) {
+            diffuseMap = material.getDiffuseMap();
+        } else {
+            diffuseMap = null;
+        }
     }
 
     private float[] getEulerAnglesFromQuaternion(Quaternionf q) {
@@ -274,4 +357,5 @@ public class NodePropertiesPanel {
 
         return angles;
     }
+
 }

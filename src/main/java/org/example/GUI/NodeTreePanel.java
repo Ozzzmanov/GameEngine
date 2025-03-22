@@ -11,14 +11,15 @@ import org.example.Node;
 import java.util.ArrayList;
 import java.util.List;
 
-public class NodeTreePanel implements EditorListener {
+public class NodeTreePanel extends AbstractPanel implements EditorListener {
     private Editor editor;
     private Node rootNode;
     private ImString newNodeName = new ImString(64);
     private Node selectedNode = null;
     private List<String> availableMeshes;
 
-    public NodeTreePanel(Editor editor, Node rootNode) {
+    public NodeTreePanel(float posX, float posY, float width, float height, Editor editor, Node rootNode) {
+        super("Hierarchy", posX, posY, width, height);
         this.editor = editor;
         this.rootNode = rootNode;
         this.editor.addEditorListener(this);
@@ -28,10 +29,10 @@ public class NodeTreePanel implements EditorListener {
         this.availableMeshes.add("/Object/Primitives/cube.obj");
         this.availableMeshes.add("/Object/Primitives/sphere.obj");
         this.availableMeshes.add("/Object/Models/gold.obj");
-        // Додавайте більше шляхів до моделей за потреби
     }
 
-    public void render() {
+    @Override
+    protected void renderContent() {
         ImGui.text("Ієрархія сцени");
         ImGui.separator();
 

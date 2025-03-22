@@ -104,17 +104,36 @@ public class Mesh {
         modelMatrix.rotate(angle, new Vector3f(0.0f, 1.0f, 0.0f));
     }
 
-    public void render(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix, Vector3f cameraPosition) {
+    public void render(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix, Vector3f cameraPosition, List<Node> lightNodes) {
         glUseProgram(shaderProgram);
         glBindVertexArray(vaoID);
+        // Если есть источники света, используем первый из них
+        if (!lightNodes.isEmpty()) {
+            Node lightNode = lightNodes.get(0);
 
-        // Позиция источника света
-        int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
-        glUniform3f(lightPosLoc, 5.0f, 5.0f, 5.0f); // Позиция света (соответствует сфере)
+            // Позиция источника света (из позиции ноды)
+            Vector3f lightPos = lightNode.getPosition();
+            int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
+            glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
 
-        // Цвет источника света
-        int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-        glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f); // Белый свет
+            // Цвет источника света (из свойств ноды)
+            Vector3f lightColor = lightNode.getLightColor();
+            int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
+            glUniform3f(lightColorLoc, lightColor.x, lightColor.y, lightColor.z);
+
+            // Если нужно, можно добавить и интенсивность
+            int lightIntensityLoc = glGetUniformLocation(shaderProgram, "lightIntensity");
+            if (lightIntensityLoc != -1) { // проверка, существует ли uniform в шейдере
+                glUniform1f(lightIntensityLoc, lightNode.getLightIntensity());
+            }
+        } else {
+            // Используем значения по умолчанию, если нет источников света
+            int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
+            glUniform3f(lightPosLoc, 5.0f, 5.0f, 5.0f);
+
+            int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
+            glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
+        }
 
         // MVP матрица и Model матрица для расчета освещения
         int mvpLoc = glGetUniformLocation(shaderProgram, "mvp");

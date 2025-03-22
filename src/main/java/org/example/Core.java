@@ -30,9 +30,9 @@ public class Core {
     private Viewport viewport;
     private List<Mesh> meshes = new ArrayList<>();
 
-    // Shader program для основного рендеринга
     private int mainShaderProgram;
     private int lightShaderProgram;
+    private int gridShaderProgram;
     private Camera camera;
     private InputManager inputManager;
     private Node node;
@@ -40,6 +40,7 @@ public class Core {
     private Editor editor;
     private TransformTool transformTool;
     private GUI gui;
+
 
 
     private void run() {
@@ -140,6 +141,10 @@ public class Core {
                     "/Shader/lightShaderProgram/light_vertex.glsl",
                     "/Shader/lightShaderProgram/light_fragment.glsl"
             );
+            gridShaderProgram = ShaderLoader.loadShader(
+                    "/Shader/gridShaderProgram/vertex_shader.glsl",
+                    "/Shader/gridShaderProgram/fragment_shader.glsl"
+            );
 
         } catch (IOException e) {
             throw new RuntimeException("Ошибка загрузки шейдеров: " + e.getMessage());
@@ -152,13 +157,13 @@ public class Core {
 
         // Загрузка моделей и настройка материалов
         Mesh gold = ObjectLoader.loadObjModel("/Object/Models/gold.obj");
-        gold.setShaderMaterial(ShaderMaterial.createGold()); // Применяем золотой материал к кубу
+        gold.setShaderMaterial(ShaderMaterial.createGold());
 
         Mesh sphereMesh = ObjectLoader.loadObjModel("/Object/Primitives/sphere.obj");
         sphereMesh.setShaderMaterial(ShaderMaterial.createSilver());
 
         Mesh cubes = ObjectLoader.loadObjModel("/Object/Primitives/cube.obj");
-        cubes.setShaderMaterial(ShaderMaterial.createTexturedMaterial("/Textures/wood_01.png"));
+        cubes.setShaderMaterial(ShaderMaterial.createTexturedMaterial("/Textures/primitivesPack/wood_01.png"));
 
         Mesh barrel = ObjectLoader.loadObjModel("/Object/Models/barrel.obj");
         barrel.setShaderMaterial(ShaderMaterial.createTexturedMaterial("/Textures/barrel/Barrel_BaseColor.jpg"));
@@ -175,12 +180,14 @@ public class Core {
                     goldNode.setPosition(4,0,4);
                 Node sphereNode = new Node("sphereNode");
                     sphereNode.addMesh(sphereMesh);
+                    sphereNode.setPosition(-3,0,4);
                 Node barrelNode = new Node("barrelNode");
                     barrelNode.addMesh(barrel);
                     barrelNode.setPosition(-2,0,-2);
             Node lightNode = new Node("lightNode");
                 lightNode.addMesh(sun);
                 lightNode.setPosition(5,5,5);
+                lightNode.setNodeType(Node.NodeType.LIGHT);
 
         node.addChild(meshNode);
             meshNode.addChild(cubeNode);
@@ -219,18 +226,20 @@ public class Core {
             Matrix4f viewMatrix = camera.getViewMatrix();
             Matrix4f projectionMatrix = viewport.getProjectionMatrix();
 
+
+
             for (Node child : node.getChildren()) {
-                switch (child.getName()) {
-                    case "meshNode":
+                switch (child.getNodeType()){
+                    case DEFAULT:
                         child.render(mainShaderProgram, viewMatrix, projectionMatrix, cameraPosition);
                         break;
-                    case "lightNode":
+                    case LIGHT:
                         child.renderLight(lightShaderProgram, viewMatrix, projectionMatrix);
                         break;
                 }
             }
 
-            grid.render(mainShaderProgram, viewMatrix, projectionMatrix);
+            grid.render(gridShaderProgram, viewMatrix, projectionMatrix);
 
             editor.update();
             editor.renderSelection();

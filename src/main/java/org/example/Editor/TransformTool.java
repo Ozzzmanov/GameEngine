@@ -49,7 +49,7 @@ public class TransformTool implements EditorListener {
     // Константи для чутливості трансформації
     private final float TRANSLATE_SENSITIVITY = 0.01f;
     private final float ROTATE_SENSITIVITY = 0.02f;
-    private final float SCALE_SENSITIVITY = 0.01f;
+    private final float SCALE_SENSITIVITY = 0.006f;
 
     // Меші для стрілок трансформації
     private Mesh arrowXMesh;
@@ -335,7 +335,6 @@ public class TransformTool implements EditorListener {
 
         // Рендеримо тільки активний інструмент трансформації, якщо є вибраний вузол
         if (selectedNode != null && !isDragging) {
-            Vector3f offset = new Vector3f(1.5f,1.5f,1.5f);
             switch (currentMode) {
                 case TRANSLATE:
                     arrowsRootNode.render(mainShaderProgram, camera.getViewMatrix(), viewport.getProjectionMatrix(), cameraPosition);
@@ -365,8 +364,6 @@ public class TransformTool implements EditorListener {
         Vector3f position = selectedNode.getPosition();
         Vector3f scaleNode = selectedNode.getScale();
         float sumScale = (scaleNode.x + scaleNode.y + scaleNode.z) * 1.1f; // сумма scale
-
-        System.out.println(scaleNode);
 
         // Ховаємо всі інструменти спочатку
         arrowsRootNode.setScale(0, 0, 0);
@@ -413,59 +410,15 @@ public class TransformTool implements EditorListener {
         Vector2f delta = new Vector2f(currentMouse).sub(startMousePosition);
         delta.mul(TRANSLATE_SENSITIVITY);
 
-        // Отримуємо вектори з камери
-        Vector3f cameraRight = camera.getRightVector();
-        Vector3f cameraUp = camera.getUpVector();
-        Vector3f cameraForward = camera.getFront();
+        // Используем общий метод для получения вектора перемещения
+        Vector3f newPosition = calculateProjection(delta, currentAxis, TransformMode.TRANSLATE);
 
-        // Створюємо нову позицію на основі початкової
-        Vector3f newPosition = new Vector3f(startPosition);
-
-        // Застосовуємо зміщення в залежності від обраної осі, з урахуванням напрямку камери
-        switch (currentAxis) {
-            case X:
-                // Проекція руху миші на площину екрану
-                float xMovement = delta.x * cameraRight.dot(new Vector3f(1, 0, 0))
-                        - delta.y * cameraUp.dot(new Vector3f(1, 0, 0));
-                newPosition.add(new Vector3f(1, 0, 0).mul(xMovement));
-                break;
-            case Y:
-                float yMovement = delta.x * cameraRight.dot(new Vector3f(0, 1, 0))
-                        - delta.y * cameraUp.dot(new Vector3f(0, 1, 0));
-                newPosition.add(new Vector3f(0, 1, 0).mul(yMovement));
-                break;
-            case Z:
-                float zMovement = delta.x * cameraRight.dot(new Vector3f(0, 0, 1))
-                        - delta.y * cameraUp.dot(new Vector3f(0, 0, 1));
-                newPosition.add(new Vector3f(0, 0, 1).mul(zMovement));
-                break;
-            case XY:
-                newPosition.add(cameraRight.mul(delta.x)).add(cameraUp.mul(-delta.y));
-                break;
-            case XZ:
-                // Проекція на площину XZ
-                Vector3f xzRight = new Vector3f(cameraRight.x, 0, cameraRight.z).normalize();
-                Vector3f xzForward = new Vector3f(cameraForward.x, 0, cameraForward.z).normalize();
-                newPosition.add(xzRight.mul(delta.x)).add(xzForward.mul(-delta.y));
-                break;
-            case YZ:
-                // Аналогічно для YZ
-                break;
-            case XYZ:
-                // Рух у площині, перпендикулярній до напрямку погляду
-                newPosition.add(cameraRight.mul(delta.x)).add(cameraUp.mul(-delta.y));
-                break;
-        }
-
-        // Застосовуємо нову позицію до вузла
+        // Применяем новую позицию к узлу
         selectedNode.setPosition(newPosition.x, newPosition.y, newPosition.z);
 
-        // Оновлюємо позицію стрілок
+        // Обновляем позицию манипуляторов
         arrowsRootNode.setPosition(newPosition.x, newPosition.y, newPosition.z);
-
-        // Оновлюємо позицію кутів
         circleRootNode.setPosition(newPosition.x, newPosition.y, newPosition.z);
-
         scaleRootNode.setPosition(newPosition.x, newPosition.y, newPosition.z);
     }
 
@@ -493,141 +446,96 @@ public class TransformTool implements EditorListener {
             case X:
                 // Используем глобальную ось X, скорректированную относительно камеры
                 rotationAxis.set(1, 0, 0);
-                angle = (cameraRight.dot(rotationAxis) > 0) ? delta.y : -delta.y;
-                deltaRotation.fromAxisAngleRad(rotationAxis, (float)Math.toRadians(angle));
+                angle = (cameraRight.dot(rotationAxis) > 0) ? delta.x : -delta.x;
+                deltaRotation.fromAxisAngleRad(rotationAxis, (float) Math.toRadians(angle));
                 break;
             case Y:
                 rotationAxis.set(0, 1, 0);
                 angle = (cameraUp.dot(rotationAxis) > 0) ? delta.x : -delta.x;
-                deltaRotation.fromAxisAngleRad(rotationAxis, (float)Math.toRadians(angle));
+                deltaRotation.fromAxisAngleRad(rotationAxis, (float) Math.toRadians(angle));
                 break;
             case Z:
                 rotationAxis.set(0, 0, 1);
                 angle = (cameraForward.dot(rotationAxis) > 0) ? delta.x : -delta.x;
-                deltaRotation.fromAxisAngleRad(rotationAxis, (float)Math.toRadians(angle));
+                deltaRotation.fromAxisAngleRad(rotationAxis, (float) Math.toRadians(angle));
                 break;
-            case XY:
-                // Для комбинированных вращений создаем два кватерниона и умножаем их
-                Quaternionf xRot = new Quaternionf().fromAxisAngleRad(
-                        new Vector3f(1, 0, 0),
-                        (float)Math.toRadians(delta.y * Math.signum(cameraRight.dot(new Vector3f(1, 0, 0))))
-                );
-                Quaternionf yRot = new Quaternionf().fromAxisAngleRad(
-                        new Vector3f(0, 1, 0),
-                        (float)Math.toRadians(delta.x * Math.signum(cameraUp.dot(new Vector3f(0, 1, 0))))
-                );
-                deltaRotation.set(xRot.mul(yRot));
-                break;
-            // Аналогично для других комбинаций осей (XZ, YZ, XYZ)
-            case XZ:
-                // Комбинированное вращение вокруг осей X и Z
-                Quaternionf xRotXZ = new Quaternionf().fromAxisAngleRad(
-                        new Vector3f(1, 0, 0),
-                        (float)Math.toRadians(delta.y * Math.signum(cameraRight.dot(new Vector3f(1, 0, 0))))
-                );
-                Quaternionf zRotXZ = new Quaternionf().fromAxisAngleRad(
-                        new Vector3f(0, 0, 1),
-                        (float)Math.toRadians(delta.x * Math.signum(cameraForward.dot(new Vector3f(0, 0, 1))))
-                );
-                deltaRotation.set(xRotXZ.mul(zRotXZ));
-                break;
-            case YZ:
-                // Комбинированное вращение вокруг осей Y и Z
-                Quaternionf yRotYZ = new Quaternionf().fromAxisAngleRad(
-                        new Vector3f(0, 1, 0),
-                        (float)Math.toRadians(delta.y * Math.signum(cameraUp.dot(new Vector3f(0, 1, 0))))
-                );
-                Quaternionf zRotYZ = new Quaternionf().fromAxisAngleRad(
-                        new Vector3f(0, 0, 1),
-                        (float)Math.toRadians(delta.x * Math.signum(cameraForward.dot(new Vector3f(0, 0, 1))))
-                );
-                deltaRotation.set(yRotYZ.mul(zRotYZ));
-                break;
-            case XYZ:
-                // Вращение по трем осям с учетом направления камеры
-                Quaternionf xRotXYZ = new Quaternionf().fromAxisAngleRad(
-                        new Vector3f(1, 0, 0),
-                        (float)Math.toRadians(delta.y * Math.signum(cameraRight.dot(new Vector3f(1, 0, 0))))
-                );
-                Quaternionf yRotXYZ = new Quaternionf().fromAxisAngleRad(
-                        new Vector3f(0, 1, 0),
-                        (float)Math.toRadians(delta.x * Math.signum(cameraUp.dot(new Vector3f(0, 1, 0))))
-                );
-                deltaRotation.set(xRotXYZ.mul(yRotXYZ));
-                break;
-        }
+     }
 
         // Применяем инкрементальное вращение к текущему кватерниону
         // При умножении справа, вращение происходит в локальной системе координат объекта
         Quaternionf newRotation = new Quaternionf(currentRotation).mul(deltaRotation);
         newRotation.normalize(); // Нормализуем для избежания ошибок накопления
 
-        // Обновляем вращение узла
-        applyNewRotation(newRotation);
+        selectedNode.setRotationQuaternion(newRotation);
 
-        // Обновляем визуальные индикаторы вращения
-        updateRotationIndicators();
-    }
-
-    // Вспомогательный метод для применения кватерниона напрямую
-    private void applyNewRotation(Quaternionf rotation) {
-        // Предполагается, что у вас есть доступ к внутреннему кватерниону узла
-        // Это можно либо реализовать через новый метод в классе Node,
-        // либо подстроить под вашу текущую архитектуру
-        selectedNode.setRotationQuaternion(rotation);
-    }
-
-    private void updateRotationIndicators() {
-        // Обновляем позицию индикаторов вращения
         circleRootNode.setPosition(selectedNode.getPosition().x, selectedNode.getPosition().y, selectedNode.getPosition().z);
-        // Здесь можно также обновить ориентацию кругов вращения, если это необходимо
-        // Например, выровнять их по осям координат с учетом текущего вращения
     }
 
     private void handleScaling() {
         Vector2f currentMouse = new Vector2f(inputManager.getMouseX(), inputManager.getMouseY());
         Vector2f delta = new Vector2f(currentMouse).sub(startMousePosition);
+        delta.mul(SCALE_SENSITIVITY);
 
+        // Используем общий метод для получения вектора масштабирования
+        Vector3f newScale = calculateProjection(delta, currentAxis, TransformMode.SCALE);
+
+        // Проверяем на отрицательные значения (опционально)
+        newScale.x = Math.max(newScale.x, 0.01f);
+        newScale.y = Math.max(newScale.y, 0.01f);
+        newScale.z = Math.max(newScale.z, 0.01f);
+
+        // Применяем новый масштаб к узлу
+        selectedNode.setScale(newScale.x, newScale.y, newScale.z);
+
+        System.out.println(selectedNode.getScale());
+    }
+
+
+    // Проекція руху миші на площину екрану
+    private Vector3f calculateProjection(Vector2f delta, TransformAxis axis, TransformMode transformMode) {
         Vector3f cameraRight = camera.getRightVector();
         Vector3f cameraUp = camera.getUpVector();
         Vector3f cameraForward = camera.getFront();
 
-        // Обчислюємо коефіцієнт масштабування
-        float scaleFactor = 1.0f + (delta.x + delta.y) * SCALE_SENSITIVITY;
+        // Для перемещения и масштабирования
+        Vector3f result = null;
 
-        // Створюємо новий масштаб на основі початкового
-        Vector3f newScale = new Vector3f(startScale);
 
-        // Застосовуємо масштабування в залежності від обраної осі
-        switch (currentAxis) {
-            case X:
-                newScale.x *= scaleFactor;
-                break;
-            case Y:
-                newScale.y *= scaleFactor;
-                break;
-            case Z:
-                newScale.z *= scaleFactor;
-                break;
-            case XY:
-                newScale.x *= scaleFactor;
-                newScale.y *= scaleFactor;
-                break;
-            case XZ:
-                newScale.x *= scaleFactor;
-                newScale.z *= scaleFactor;
-                break;
-            case YZ:
-                newScale.y *= scaleFactor;
-                newScale.z *= scaleFactor;
-                break;
-            case XYZ:
-                newScale.mul(scaleFactor);
-                break;
+        if (transformMode == TransformMode.TRANSLATE || transformMode == TransformMode.SCALE) {
+            // Начальный вектор в зависимости от операции
+            result = transformMode == TransformMode.TRANSLATE ?
+                    new Vector3f(startPosition) : new Vector3f(startScale);
         }
 
-        // Застосовуємо новий масштаб до вузла
-        selectedNode.setScale(newScale.x, newScale.y, newScale.z);
+        switch (axis) {
+            case X:
+                if (transformMode == TransformMode.TRANSLATE || transformMode == TransformMode.SCALE) {
+                    float xMovement = delta.x * cameraRight.dot(new Vector3f(1, 0, 0))
+                            - delta.y * cameraUp.dot(new Vector3f(1, 0, 0));
+                    result.add(new Vector3f(1, 0, 0).mul(xMovement));
+                }
+                break;
+
+            case Y:
+                if (transformMode == TransformMode.TRANSLATE || transformMode == TransformMode.SCALE) {
+                    float yMovement = delta.x * cameraRight.dot(new Vector3f(0, 1, 0))
+                            - delta.y * cameraUp.dot(new Vector3f(0, 1, 0));
+                    result.add(new Vector3f(0, 1, 0).mul(yMovement));
+                }
+                break;
+
+            case Z:
+                if (transformMode == TransformMode.TRANSLATE || transformMode == TransformMode.SCALE) {
+                    float zMovement = delta.x * cameraRight.dot(new Vector3f(0, 0, 1))
+                            - delta.y * cameraUp.dot(new Vector3f(0, 0, 1));
+                    result.add(new Vector3f(0, 0, 1).mul(zMovement));
+                }
+                break;
+
+        }
+
+        // Возвращаем соответствующий результат
+        return result;
     }
 
     private void finishTransform() {

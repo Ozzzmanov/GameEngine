@@ -167,8 +167,23 @@ public class ShaderMaterial {
     }
 
     public void setDiffuseMap(TextureLoader diffuseMap) {
+        if (this.diffuseMap != null && diffuseMap == null) {
+            // Очищаем предыдущую текстуру, если она была
+            this.diffuseMap.cleanup();
+        }
         this.diffuseMap = diffuseMap;
         this.hasTexture = diffuseMap != null;
+    }
+
+    public void setDiffuseMapPath(String texturePath) {
+        try {
+            this.diffuseMap = new TextureLoader(texturePath);
+            this.hasTexture = true;
+        } catch (IOException e) {
+            System.err.println("Помилка при завантаженні текстури: " + e.getMessage());
+            e.printStackTrace();
+            this.hasTexture = false;
+        }
     }
 
     public boolean hasTexture() {
