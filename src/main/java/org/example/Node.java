@@ -2,6 +2,7 @@ package org.example;
 
 import org.example.Editor.Component;
 import org.example.Editor.NodeListener;
+import org.example.Render.*;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -115,17 +116,25 @@ public class Node {
     public void render(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix, Vector3f cameraPosition) {
         updateWorldTransformation();
 
-        // Получаем все источники света в сцене
+        // Отримуємо всі джерела світла в сцені
         List<Node> lightNodes = getRootNode().getLightNodes();
 
+        // Рендеринг всіх мешів цього вузла
         for (Mesh mesh : meshes) {
+            switch (nodeType) {
+                case DEFAULT:
+                    mesh.setRenderStrategy(new DefaultRenderStrategy());
+                    break;
+                case LIGHT:
+                    mesh.setRenderStrategy(new LightRenderStrategy());
+                    break;
+            }
             mesh.render(shaderProgram, viewMatrix, projectionMatrix, cameraPosition, lightNodes);
         }
 
+        // Рендеринг дочірніх вузлів
         for (Node child : children) {
-            if (child.getNodeType() != NodeType.LIGHT) { // Не рендерим ноды света через обычный шейдер
-                child.render(shaderProgram, viewMatrix, projectionMatrix, cameraPosition);
-            }
+            child.render(shaderProgram, viewMatrix, projectionMatrix, cameraPosition);
         }
     }
 
@@ -136,18 +145,6 @@ public class Node {
             current = current.getParent();
         }
         return current;
-    }
-
-    public void renderLight(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
-        updateWorldTransformation();
-
-        for (Mesh mesh : meshes) {
-            mesh.renderLight(shaderProgram, viewMatrix, projectionMatrix);
-        }
-
-        for (Node child : children) {
-            child.renderLight(shaderProgram, viewMatrix, projectionMatrix);
-        }
     }
 
     public void cleanup() {

@@ -16,15 +16,15 @@ import static org.lwjgl.stb.STBImage.*;
 
 public class TextureLoader {
     private final int id;
-    private int width;
-    private int height;
+    private static int width;
+    private static int height;
 
     public TextureLoader(String path) throws IOException {
         // Завантаження текстури з ресурсів
         id = loadTexture(path);
     }
 
-    private int loadTexture(String path) throws IOException {
+    private static int loadTexture(String path) throws IOException {
         // Завантаження зображення використовуючи STB бібліотеку
         ByteBuffer imageBuffer;
         try (MemoryStack stack = MemoryStack.stackPush()) {

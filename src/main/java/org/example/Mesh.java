@@ -1,5 +1,7 @@
 package org.example;
 
+import org.example.Render.DefaultRenderStrategy;
+import org.example.Render.RenderStrategy;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
@@ -20,6 +22,8 @@ public class Mesh {
     private final int[] indices;
     private Matrix4f modelMatrix;
     private final Vector3f position;
+
+    private RenderStrategy renderStrategy;
 
     private float rotationSpeed = 90.0f;
 
@@ -97,6 +101,9 @@ public class Mesh {
                 new Vector3f(0.5f, 0.5f, 0.5f), // specular
                 32.0f // shininess
         );
+
+        // За замовчуванням використовуємо стандартну стратегію
+        this.renderStrategy = new DefaultRenderStrategy();
     }
 
     public void update(float deltaTime) {
@@ -104,148 +111,12 @@ public class Mesh {
         modelMatrix.rotate(angle, new Vector3f(0.0f, 1.0f, 0.0f));
     }
 
+    public void setRenderStrategy(RenderStrategy strategy) {
+        this.renderStrategy = strategy;
+    }
+
     public void render(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix, Vector3f cameraPosition, List<Node> lightNodes) {
-        glUseProgram(shaderProgram);
-        glBindVertexArray(vaoID);
-        // Если есть источники света, используем первый из них
-        if (!lightNodes.isEmpty()) {
-            Node lightNode = lightNodes.get(0);
-
-            // Позиция источника света (из позиции ноды)
-            Vector3f lightPos = lightNode.getPosition();
-            int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
-            glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
-
-            // Цвет источника света (из свойств ноды)
-            Vector3f lightColor = lightNode.getLightColor();
-            int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-            glUniform3f(lightColorLoc, lightColor.x, lightColor.y, lightColor.z);
-
-            // Если нужно, можно добавить и интенсивность
-            int lightIntensityLoc = glGetUniformLocation(shaderProgram, "lightIntensity");
-            if (lightIntensityLoc != -1) { // проверка, существует ли uniform в шейдере
-                glUniform1f(lightIntensityLoc, lightNode.getLightIntensity());
-            }
-        } else {
-            // Используем значения по умолчанию, если нет источников света
-            int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
-            glUniform3f(lightPosLoc, 5.0f, 5.0f, 5.0f);
-
-            int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-            glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
-        }
-
-        // MVP матрица и Model матрица для расчета освещения
-        int mvpLoc = glGetUniformLocation(shaderProgram, "mvp");
-        int modelLoc = glGetUniformLocation(shaderProgram, "model");
-        int normalMatrixLoc = glGetUniformLocation(shaderProgram, "normalMatrix");
-
-        // Применяем материал
-        if (shaderMaterial != null) {
-            shaderMaterial.apply(shaderProgram);
-        }
-
-        // Позиция камеры для бликов - використовуємо реальну позицію камери
-        int viewPosLoc = glGetUniformLocation(shaderProgram, "viewPos");
-        glUniform3f(viewPosLoc, cameraPosition.x, cameraPosition.y, cameraPosition.z);
-
-        // Вычисление матриц
-        Matrix4f mvpMatrix = new Matrix4f();
-        projectionMatrix.mul(viewMatrix, mvpMatrix);
-        mvpMatrix.mul(modelMatrix);
-
-        // Матрица нормалей (инвертированная транспонированная модельная матрица)
-        Matrix4f normalMatrix = new Matrix4f(modelMatrix);
-        normalMatrix.invert().transpose();
-
-        // Передача матриц в шейдер
-        float[] mvpBuffer = new float[16];
-        mvpMatrix.get(mvpBuffer);
-        glUniformMatrix4fv(mvpLoc, false, mvpBuffer);
-
-        float[] modelBuffer = new float[16];
-        modelMatrix.get(modelBuffer);
-        glUniformMatrix4fv(modelLoc, false, modelBuffer);
-
-        float[] normalMatrixBuffer = new float[16];
-        normalMatrix.get(normalMatrixBuffer);
-        glUniformMatrix4fv(normalMatrixLoc, false, normalMatrixBuffer);
-
-        glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
-
-        glBindVertexArray(0);
-        glUseProgram(0);
-    }
-
-    public void renderLight(int lightShaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
-
-        glUseProgram(lightShaderProgram);
-        glBindVertexArray(vaoID);
-
-        int mvpLoc = glGetUniformLocation(lightShaderProgram, "mvp");
-
-        Matrix4f mvpMatrix = new Matrix4f();
-        projectionMatrix.mul(viewMatrix, mvpMatrix);
-        mvpMatrix.mul(modelMatrix);
-
-        float[] mvpBuffer = new float[16];
-        mvpMatrix.get(mvpBuffer);
-        glUniformMatrix4fv(mvpLoc, false, mvpBuffer);
-
-        // Устанавливаем цвет источника света
-        int lightColorLoc = glGetUniformLocation(lightShaderProgram, "lightColor");
-        glUniform3f(lightColorLoc, 1.0f, 1.0f, 0.0f); // Желтый цвет для источника света
-
-
-        glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
-
-        glBindVertexArray(0);
-        glUseProgram(0);
-    }
-
-    public void renderVertices() {
-        glBindVertexArray(vaoID);
-        glEnableVertexAttribArray(0);
-        glPointSize(5.0f);
-        glDrawElements(GL_POINTS, vertexCount, GL_UNSIGNED_INT, 0);
-        glDisableVertexAttribArray(0);
-        glBindVertexArray(0);
-    }
-
-    public void renderEdges() {
-        glBindVertexArray(vaoID);
-        glEnableVertexAttribArray(0);
-        glDrawElements(GL_LINES, vertexCount, GL_UNSIGNED_INT, 0);
-        glDisableVertexAttribArray(0);
-        glBindVertexArray(0);
-    }
-
-    public void renderWireframe() {
-        glBindVertexArray(vaoID);
-        glEnableVertexAttribArray(0);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDisableVertexAttribArray(0);
-        glBindVertexArray(0);
-    }
-
-    public static void renderAllVertices(List<Mesh> meshes) {
-        for (Mesh mesh : meshes) {
-            mesh.renderVertices();
-        }
-    }
-
-    public static void renderAllEdges(List<Mesh> meshes) {
-        for (Mesh mesh : meshes) {
-            mesh.renderEdges();
-        }
-    }
-
-    public static void renderAllWireframe(List<Mesh> meshes) {
-        for (Mesh mesh : meshes) {
-            mesh.renderWireframe();
-        }
+        renderStrategy.render(this, shaderProgram, viewMatrix, projectionMatrix, cameraPosition, lightNodes);
     }
 
     public void cleanup() {
@@ -291,5 +162,7 @@ public class Mesh {
         return new Matrix4f(modelMatrix);
     }
 
-
+    public int getVertexCount() {
+        return vertexCount;
+    }
 }

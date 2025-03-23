@@ -90,7 +90,7 @@ public class Core {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
         // Создание окна
-        window = glfwCreateWindow(WIDTH, HEIGHT, "3D Рендеринг с шейдерами", NULL, NULL);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "HexEngine", NULL, NULL);
         if (window == NULL)
             throw new RuntimeException("Ошибка создания окна GLFW");
 
@@ -229,12 +229,12 @@ public class Core {
 
 
             for (Node child : node.getChildren()) {
-                switch (child.getNodeType()){
+                switch (child.getNodeType()) {
                     case DEFAULT:
                         child.render(mainShaderProgram, viewMatrix, projectionMatrix, cameraPosition);
                         break;
                     case LIGHT:
-                        child.renderLight(lightShaderProgram, viewMatrix, projectionMatrix);
+                        child.render(lightShaderProgram, viewMatrix, projectionMatrix, cameraPosition);
                         break;
                 }
             }

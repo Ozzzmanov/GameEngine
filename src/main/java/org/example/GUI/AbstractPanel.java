@@ -3,7 +3,26 @@ package org.example.GUI;
 import imgui.ImGui;
 import imgui.flag.ImGuiWindowFlags;
 
-// Абстрактний клас, що реалізує базову логіку для всіх панелей
+/**
+ * Абстрактний клас `AbstractPanel`, що реалізує базову логіку для всіх панелей GUI.
+ * Забезпечує стандартне відображення вікна та управління його розмірами й позицією.
+ *
+ * Основні функції:
+ * - Встановлює позицію та розмір вікна перед рендерингом.
+ * - Використовує ImGuiWindowFlags для заборони переміщення та згортання.
+ * - Дозволяє нащадкам реалізовувати метод `renderContent()` для вмісту панелі.
+ *
+ * Основні методи:
+ * - `render()` – відображає вікно та викликає `renderContent()`.
+ * - `init()` – базова ініціалізація, яку можуть перевизначати підкласи.
+ * - `cleanup()` – базове очищення ресурсів.
+ * - `setPosition(x, y)`, `setSize(width, height)` – методи для зміни положення та розміру панелі.
+ *
+ * @author Вадим Овсюк
+ * @version 0.8
+ * @since 2025-03-23
+ */
+
 public abstract class AbstractPanel implements Panel {
     protected String title;
     protected float posX, posY;

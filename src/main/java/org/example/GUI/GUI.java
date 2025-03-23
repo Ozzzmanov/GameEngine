@@ -17,6 +17,27 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Клас `GUI` відповідає за створення та управління графічним інтерфейсом редактора.
+ * Використовує бібліотеку ImGui для відображення панелей та інструментів.
+ *
+ * Основні функції:
+ * - Ініціалізація ImGui
+ * - Завантаження шрифтів
+ * - Управління панелями редактора
+ * - Рендеринг інтерфейсу
+ * - Оновлення макету при зміні розміру вікна
+ *
+ * Залежності:
+ * - imgui (бібліотека для графічного інтерфейсу)
+ * - org.example.Editor (редактор та інструменти)
+ * - org.example.Node (структура даних сцени)
+ *
+ * @author Вадим Овсюк
+ * @version 0.8
+ * @since 2025-03-23
+ */
+
 public class GUI {
     // Основні компоненти ImGui
     private final ImGuiImplGlfw imGuiGlfw = new ImGuiImplGlfw();
