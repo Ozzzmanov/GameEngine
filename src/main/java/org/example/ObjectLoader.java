@@ -123,7 +123,7 @@ public class ObjectLoader {
                         }
                     }
 
-                    // Триангуляция и создание уникальных вершин
+                    // Триангуляция
                     for (int i = 1; i < vertIndices.length - 1; i++) {
                         addVertex(vertIndices[0], normIndices[0], texIndices[0],
                                 positions, hasNormals ? normals : null, texCoords,
@@ -186,7 +186,7 @@ public class ObjectLoader {
         }
     }
 
-    // Вспомогательный метод для добавления вершины (обновленный для поддержки текстур)
+    // Вспомогательный метод для добавления вершины
     private static void addVertex(int posIndex, int normIndex, int texIndex,
                                   List<Vector3f> positions, List<Vector3f> normals,
                                   List<Vector2f> texCoords, Vector3f[] tempNormals,

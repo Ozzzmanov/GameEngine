@@ -3,6 +3,9 @@ package org.example;
 import org.example.Editor.Editor;
 import org.example.Editor.TransformTool;
 import org.example.GUI.GUI;
+import org.example.Render.Shadow.IShadowMap;
+import org.example.Render.Shadow.ShadowMap;
+import org.example.Render.Shadow.ShadowRenderer;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFWErrorCallback;
@@ -33,6 +36,8 @@ public class Core {
     private int mainShaderProgram;
     private int lightShaderProgram;
     private int gridShaderProgram;
+    private int shadowShaderProgram;
+
     private Camera camera;
     private InputManager inputManager;
     private Node node;
@@ -40,8 +45,7 @@ public class Core {
     private Editor editor;
     private TransformTool transformTool;
     private GUI gui;
-
-
+    private IShadowMap shadowMap;
 
     private void run() {
         init();
@@ -54,6 +58,8 @@ public class Core {
         // Удаляем шейдерные программы
         glDeleteProgram(mainShaderProgram);
         glDeleteProgram(lightShaderProgram);
+        glDeleteProgram(gridShaderProgram);
+        glDeleteProgram(shadowShaderProgram);
         meshes.clear();
 
         if (node != null) {
@@ -67,6 +73,9 @@ public class Core {
         }
         if(transformTool != null){
             transformTool.cleanup();
+        }
+        if(shadowMap != null) {
+            shadowMap.cleanup(); // Очистка ресурсов теневой карты
         }
 
 
@@ -145,11 +154,17 @@ public class Core {
                     "/Shader/gridShaderProgram/vertex_shader.glsl",
                     "/Shader/gridShaderProgram/fragment_shader.glsl"
             );
+            shadowShaderProgram = ShaderLoader.loadShader(
+                    "/Shader/shadowShaderProgram/shadow_vertex.glsl",
+                    "/Shader/shadowShaderProgram/shadow_fragment.glsl"
+            );
 
         } catch (IOException e) {
             throw new RuntimeException("Ошибка загрузки шейдеров: " + e.getMessage());
         }
 
+        // Создание карты теней
+        shadowMap = new ShadowMap(shadowShaderProgram);
 
         // Создание и настройка камеры
         camera = new Camera(new Vector3f(3.0f, 3.0f, 3.0f), new Vector3f(0.0f, 1.0f, 0.0f), -135.0f, -30.0f);
@@ -209,25 +224,55 @@ public class Core {
     }
 
     private void loop() {
-
-        // Цвет фона
+        // Колір фону
         glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
 
-        while (!glfwWindowShouldClose(window)) {
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        ShadowRenderer shadowRenderer = new ShadowRenderer(shadowMap, shadowShaderProgram);
 
-            // Обновляем контроллер ввода
+        while (!glfwWindowShouldClose(window)) {
+            // Оновлюємо контролер вводу
             inputManager.update();
 
-            // Позиція камери вектор
+            // Отримуємо позицію камери та матриці виду і проекції
             Vector3f cameraPosition = camera.getPosition();
-
-            // Получаем матрицы вида и проекции от камеры и вьюпорта
             Matrix4f viewMatrix = camera.getViewMatrix();
             Matrix4f projectionMatrix = viewport.getProjectionMatrix();
 
+            // Отримуємо вузли джерел світла
+            List<Node> lightNodes = node.getLightNodes();
+            Vector3f lightPos = lightNodes.isEmpty() ? new Vector3f(5, 5, 5) : lightNodes.get(0).getPosition();
 
+            // Оновлюємо матрицю простору світла для тіней
+            shadowMap.updateLightSpaceMatrix(lightPos, new Vector3f(0, 0, 0), 0.1f, 25.0f);
 
+            // Перший прохід - рендеринг в карту тіней
+            shadowMap.bindForShadowPass();
+            // Рендеримо тільки основні об'єкти (не джерела світла та сітку)
+            for (Node child : node.getChildren()) {
+                if (child.getNodeType() == Node.NodeType.DEFAULT) {
+                    // Для тіньової карти використовуємо тільки основні вузли
+                    shadowRenderer.renderNodeShadows(child, shadowMap.getLightSpaceMatrix());
+                }
+            }
+            shadowMap.unbind(WIDTH, HEIGHT);
+
+            // Другий прохід - основний рендеринг
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // Прив'язуємо текстуру тіньової карти
+            shadowMap.bindDepthMapForReading(1); // Текстурний блок 1
+
+            // Для кожної шейдерної програми передаємо тіньову карту
+            glUseProgram(mainShaderProgram);
+            int shadowMapLoc = glGetUniformLocation(mainShaderProgram, "shadowMap");
+            glUniform1i(shadowMapLoc, 1);  // Текстурний блок 1
+
+            int lightSpaceMatrixLoc = glGetUniformLocation(mainShaderProgram, "lightSpaceMatrix");
+            float[] lightSpaceMatrixData = new float[16];
+            shadowMap.getLightSpaceMatrix().get(lightSpaceMatrixData);
+            glUniformMatrix4fv(lightSpaceMatrixLoc, false, lightSpaceMatrixData);
+
+            // Рендеримо сцену звичайним чином
             for (Node child : node.getChildren()) {
                 switch (child.getNodeType()) {
                     case DEFAULT:
@@ -239,8 +284,8 @@ public class Core {
                 }
             }
 
-            grid.render(gridShaderProgram, viewMatrix, projectionMatrix);
 
+            grid.render(gridShaderProgram, viewMatrix, projectionMatrix);
             editor.update();
             editor.renderSelection();
 
@@ -248,7 +293,7 @@ public class Core {
 
             gui.render();
 
-            // Отключаем шейдер
+            // Вимикаємо шейдер
             glUseProgram(0);
 
             glfwSwapBuffers(window);

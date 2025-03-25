@@ -1,5 +1,8 @@
 package org.example;
 
+import org.example.Render.DefaultRenderStrategy;
+import org.example.Render.Grid.GridRenderStrategy;
+import org.example.Render.RenderStrategy;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
@@ -44,9 +47,12 @@ public class Grid {
     // Чи ініціалізовано буфери
     private boolean initialized = false;
 
-    /**
-     * Ініціалізація VAO, VBO та EBO для сітки та осей
-     */
+    private RenderStrategy renderStrategy;
+
+    public Grid() {
+        this.renderStrategy = new GridRenderStrategy();
+    }
+
     public void init() {
         if (initialized) {
             return;
@@ -236,77 +242,83 @@ public class Grid {
         if (!initialized) {
             init();
         }
-
-        // Використовуємо шейдерну програму
-        glUseProgram(shaderProgram);
-
-        // Створюємо модельну матрицю (для сітки це одинична матриця)
-        Matrix4f modelMatrix = new Matrix4f().identity();
-
-        // Створюємо комбіновану матрицю MVP (Model-View-Projection)
-        Matrix4f mvpMatrix = new Matrix4f();
-        projectionMatrix.mul(viewMatrix, mvpMatrix);   // mvp = projection * view
-        mvpMatrix.mul(modelMatrix);                    // mvp = projection * view * model
-
-        // Передаємо MVP матрицю в шейдер (за допомогою uniform mvp)
-        int mvpLoc = glGetUniformLocation(shaderProgram, "mvp");
-
-        // Створюємо буфер для матриці MVP
-        FloatBuffer mvpBuffer = MemoryUtil.memAllocFloat(16);
-
-        try {
-            // Заповнюємо буфер даними з матриці MVP
-            mvpMatrix.get(mvpBuffer);
-
-            // Передаємо матрицю MVP в шейдер
-            glUniformMatrix4fv(mvpLoc, false, mvpBuffer);
-
-            // Встановлюємо власні значення матеріалу для сітки
-            int ambientLoc = glGetUniformLocation(shaderProgram, "material.ambient");
-            int diffuseLoc = glGetUniformLocation(shaderProgram, "material.diffuse");
-            int specularLoc = glGetUniformLocation(shaderProgram, "material.specular");
-            int shininessLoc = glGetUniformLocation(shaderProgram, "material.shininess");
-
-            // Встановлюємо значення за замовчуванням для матеріалу сітки
-            glUniform3f(ambientLoc, 0.5f, 0.5f, 0.5f);
-            glUniform3f(diffuseLoc, 0.5f, 0.5f, 0.5f);
-            glUniform3f(specularLoc, 0.0f, 0.0f, 0.0f);
-            glUniform1f(shininessLoc, 1.0f);
-
-            // Малюємо сітку
-            glBindVertexArray(gridVAO);
-
-            // Встановлюємо колір для сітки через uniform lightColor
-            int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-            glUniform3f(lightColorLoc, 0.3f, 0.3f, 0.3f);
-
-
-            glLineWidth(1.0f);
-            glDrawElements(GL_LINES, gridVertexCount, GL_UNSIGNED_INT, 0);
-
-            // Малюємо осі з різними кольорами
-            glBindVertexArray(axesVAO);
-            glLineWidth(2.0f);
-
-            // Малюємо вісь X (червона)
-            glUniform3f(lightColorLoc, xAxisColor[0], xAxisColor[1], xAxisColor[2]);
-            glDrawArrays(GL_LINES, 0, 2);
-
-            // Малюємо вісь Y (зелена)
-            glUniform3f(lightColorLoc, yAxisColor[0], yAxisColor[1], yAxisColor[2]);
-            glDrawArrays(GL_LINES, 2, 2);
-
-            // Малюємо вісь Z (синя)
-            glUniform3f(lightColorLoc, zAxisColor[0], zAxisColor[1], zAxisColor[2]);
-            glDrawArrays(GL_LINES, 4, 2);
-
-            // Відв'язуємо VAO
-            glBindVertexArray(0);
-        } finally {
-            // Звільняємо пам'ять буфера
-            MemoryUtil.memFree(mvpBuffer);
-        }
+        renderStrategy.render(this, shaderProgram, viewMatrix, projectionMatrix);
     }
+//    public void render(int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+//        if (!initialized) {
+//            init();
+//        }
+//
+//        // Використовуємо шейдерну програму
+//        glUseProgram(shaderProgram);
+//
+//        // Створюємо модельну матрицю (для сітки це одинична матриця)
+//        Matrix4f modelMatrix = new Matrix4f().identity();
+//
+//        // Створюємо комбіновану матрицю MVP (Model-View-Projection)
+//        Matrix4f mvpMatrix = new Matrix4f();
+//        projectionMatrix.mul(viewMatrix, mvpMatrix);   // mvp = projection * view
+//        mvpMatrix.mul(modelMatrix);                    // mvp = projection * view * model
+//
+//        // Передаємо MVP матрицю в шейдер (за допомогою uniform mvp)
+//        int mvpLoc = glGetUniformLocation(shaderProgram, "mvp");
+//
+//        // Створюємо буфер для матриці MVP
+//        FloatBuffer mvpBuffer = MemoryUtil.memAllocFloat(16);
+//
+//        try {
+//            // Заповнюємо буфер даними з матриці MVP
+//            mvpMatrix.get(mvpBuffer);
+//
+//            // Передаємо матрицю MVP в шейдер
+//            glUniformMatrix4fv(mvpLoc, false, mvpBuffer);
+//
+//            // Встановлюємо власні значення матеріалу для сітки
+//            int ambientLoc = glGetUniformLocation(shaderProgram, "material.ambient");
+//            int diffuseLoc = glGetUniformLocation(shaderProgram, "material.diffuse");
+//            int specularLoc = glGetUniformLocation(shaderProgram, "material.specular");
+//            int shininessLoc = glGetUniformLocation(shaderProgram, "material.shininess");
+//
+//            // Встановлюємо значення за замовчуванням для матеріалу сітки
+//            glUniform3f(ambientLoc, 0.5f, 0.5f, 0.5f);
+//            glUniform3f(diffuseLoc, 0.5f, 0.5f, 0.5f);
+//            glUniform3f(specularLoc, 0.0f, 0.0f, 0.0f);
+//            glUniform1f(shininessLoc, 1.0f);
+//
+//            // Малюємо сітку
+//            glBindVertexArray(gridVAO);
+//
+//            // Встановлюємо колір для сітки через uniform lightColor
+//            int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
+//            glUniform3f(lightColorLoc, 0.3f, 0.3f, 0.3f);
+//
+//
+//            glLineWidth(1.0f);
+//            glDrawElements(GL_LINES, gridVertexCount, GL_UNSIGNED_INT, 0);
+//
+//            // Малюємо осі з різними кольорами
+//            glBindVertexArray(axesVAO);
+//            glLineWidth(2.0f);
+//
+//            // Малюємо вісь X (червона)
+//            glUniform3f(lightColorLoc, xAxisColor[0], xAxisColor[1], xAxisColor[2]);
+//            glDrawArrays(GL_LINES, 0, 2);
+//
+//            // Малюємо вісь Y (зелена)
+//            glUniform3f(lightColorLoc, yAxisColor[0], yAxisColor[1], yAxisColor[2]);
+//            glDrawArrays(GL_LINES, 2, 2);
+//
+//            // Малюємо вісь Z (синя)
+//            glUniform3f(lightColorLoc, zAxisColor[0], zAxisColor[1], zAxisColor[2]);
+//            glDrawArrays(GL_LINES, 4, 2);
+//
+//            // Відв'язуємо VAO
+//            glBindVertexArray(0);
+//        } finally {
+//            // Звільняємо пам'ять буфера
+//            MemoryUtil.memFree(mvpBuffer);
+//        }
+//    }
 
     /**
      * Очищення ресурсів OpenGL
@@ -343,5 +355,33 @@ public class Grid {
     public void setGridExtent(float gridExtent) {
         this.gridExtent = gridExtent;
         initialized = false; // Потрібна реініціалізація
+    }
+
+    public int getGridVAO() {
+        return gridVAO;
+    }
+
+    public int getGridVertexCount() {
+        return gridVertexCount;
+    }
+
+    public int getAxesVAO() {
+        return axesVAO;
+    }
+
+    public float[] getxAxisColor() {
+        return xAxisColor;
+    }
+
+    public float[] getyAxisColor() {
+        return yAxisColor;
+    }
+
+    public float[] getzAxisColor() {
+        return zAxisColor;
+    }
+
+    public boolean isInitialized() {
+        return initialized;
     }
 }

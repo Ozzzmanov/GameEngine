@@ -10,9 +10,9 @@ import java.util.List;
 import static org.lwjgl.opengl.GL30.*;
 
 public class DefaultRenderStrategy implements RenderStrategy {
-
     @Override
-    public void render(Mesh mesh, int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix, Vector3f cameraPosition, List<Node> lightNodes) {
+    public void render(Mesh mesh, int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix,
+                       Vector3f cameraPosition, List<Node> lightNodes) {
         glUseProgram(shaderProgram);
         glBindVertexArray(mesh.getVaoID());
 
@@ -27,7 +27,7 @@ public class DefaultRenderStrategy implements RenderStrategy {
             int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
             glUniform3f(lightColorLoc, lightColor.x, lightColor.y, lightColor.z);
 
-            // Передача інтенсивності, якщо потрібно
+            // Передача інтенсивності
             int lightIntensityLoc = glGetUniformLocation(shaderProgram, "lightIntensity");
             if (lightIntensityLoc != -1) {
                 glUniform1f(lightIntensityLoc, lightNode.getLightIntensity());
@@ -39,6 +39,18 @@ public class DefaultRenderStrategy implements RenderStrategy {
 
             int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
             glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
+        }
+
+        // Отримання локації для теневой карты
+        int shadowMapLoc = glGetUniformLocation(shaderProgram, "shadowMap");
+        if (shadowMapLoc != -1) {
+            glUniform1i(shadowMapLoc, 1);  // Текстурний блок 1
+        }
+
+        // Локація для матриці простору світла
+        int lightSpaceMatrixLoc = glGetUniformLocation(shaderProgram, "lightSpaceMatrix");
+        if (lightSpaceMatrixLoc != -1) {
+            // Матриця буде встановлена ззовні
         }
 
         // MVP матриця та інші розрахунки

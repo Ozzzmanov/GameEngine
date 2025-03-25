@@ -1,5 +1,6 @@
 package org.example.Render;
 
+import org.example.Grid;
 import org.example.Mesh;
 import org.example.Node;
 import org.joml.Matrix4f;
@@ -33,5 +34,17 @@ import java.util.List;
  */
 
 public interface RenderStrategy {
-    void render(Mesh mesh, int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix, Vector3f cameraPosition, List<Node> lightNodes);
+    default void render(Mesh mesh, int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix,
+                        Vector3f cameraPosition, List<Node> lightNodes) {
+        // Реалізація для звичайного рендерингу
+    }
+
+    default void render(Mesh mesh, int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix,
+                        Matrix4f lightSpaceMatrix) {
+        // Реалізація для рендерингу тіней
+    }
+
+    default void render(Grid grid, int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+        // Реалізація для рендерингу сітки
+    }
 }

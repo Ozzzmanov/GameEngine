@@ -1,21 +1,17 @@
-package org.example.Render;
+package org.example.Render.Light;
 
 import org.example.Mesh;
 import org.example.Node;
+import org.example.Render.RenderStrategy;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.util.List;
 
-import static org.lwjgl.opengl.GL11.GL_POINTS;
-import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
-import static org.lwjgl.opengl.GL11.glDrawElements;
-import static org.lwjgl.opengl.GL11.glPointSize;
-import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL20.glUseProgram;
-import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL30.*;
 
-public class EdgesRenderStrategy implements RenderStrategy {
+public class LightRenderStrategy implements RenderStrategy {
+
     @Override
     public void render(Mesh mesh, int shaderProgram, Matrix4f viewMatrix, Matrix4f projectionMatrix, Vector3f cameraPosition, List<Node> lightNodes) {
         glUseProgram(shaderProgram);
@@ -31,12 +27,13 @@ public class EdgesRenderStrategy implements RenderStrategy {
         mvpMatrix.get(mvpBuffer);
         glUniformMatrix4fv(mvpLoc, false, mvpBuffer);
 
-        glEnableVertexAttribArray(0);
-        glDrawElements(GL_LINES, mesh.getVertexCount(), GL_UNSIGNED_INT, 0);
-        glDisableVertexAttribArray(0);
+        // Встановлюємо колір джерела світла
+        int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
+        glUniform3f(lightColorLoc, 1.0f, 1.0f, 0.0f); // Жовтий колір для джерела світла
+
+        glDrawElements(GL_TRIANGLES, mesh.getVertexCount(), GL_UNSIGNED_INT, 0);
+
         glBindVertexArray(0);
-
         glUseProgram(0);
-
     }
 }

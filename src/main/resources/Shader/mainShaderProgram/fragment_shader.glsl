@@ -4,6 +4,7 @@
 in vec3 FragPos;
 in vec3 Normal;
 in vec2 TexCoord;
+in vec4 FragPosLightSpace; // Для теней
 
 // Выходной цвет фрагмента
 out vec4 FragColor;
@@ -24,52 +25,85 @@ uniform vec3 viewPos;      // Позиция камеры
 uniform vec3 lightColor;   // Цвет источника света
 uniform float lightIntensity; // Интенсивность источника света
 uniform Material material;
+uniform sampler2D shadowMap; // Карта теней
 
-void main()
-{
-    // Определяем базовый цвет (из текстуры или материала)
-    vec3 baseColor;
-    if (material.useTexture == 1) {
-        baseColor = vec3(texture(material.diffuseMap, TexCoord));
-    } else {
-        baseColor = material.diffuse;
+float ShadowCalculation(vec4 fragPosLightSpace) {
+    // Преобразуем координаты в нормализованные координаты устройства
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
+    // Преобразуем диапазон [-1,1] в [0,1]
+    projCoords = projCoords * 0.5 + 0.5;
+
+    // Получаем ближайшую глубину от источника света
+    float closestDepth = texture(shadowMap, projCoords.xy).r;
+
+    // Получаем глубину текущего фрагмента от источника света
+    float currentDepth = projCoords.z;
+
+    // Добавляем смещение для борьбы с акне теней
+    float bias = 0.005;
+
+    // Проверяем, находится ли фрагмент в тени
+    float shadow = 0.0;
+
+    // PCF (Percentage Closer Filtering) для сглаживания теней
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
     }
+    shadow /= 9.0;
 
-    // Направление света (от фрагмента к источнику света)
+    // Проверяем, находится ли вообще фрагмент в пределах карты теней
+    if(projCoords.z > 1.0)
+    shadow = 0.0;
+
+    return shadow;
+}
+
+void main() {
+    // Нормализуем нормаль (она может быть не нормализованной из-за интерполяции)
+    vec3 norm = normalize(Normal);
+
+    // Направление к источнику света
     vec3 lightDir = normalize(lightPos - FragPos);
 
     // Направление обзора (от фрагмента к камере)
     vec3 viewDir = normalize(viewPos - FragPos);
 
-    // Нормализованная нормаль фрагмента
-    vec3 norm = normalize(Normal);
+    // Направление отражения (для зеркального освещения)
+    vec3 reflectDir = reflect(-lightDir, norm);
 
-    // Ambient составляющая (фоновое освещение)
+    // Рассчитываем коэффициенты освещения
+
+    // Фоновое освещение (ambient)
     vec3 ambient;
     if (material.useTexture == 1) {
-        ambient = material.ambient * baseColor;
+        ambient = material.ambient * texture(material.diffuseMap, TexCoord).rgb;
     } else {
-        ambient = material.ambient * lightColor;
+        ambient = material.ambient;
     }
 
-    // Diffuse составляющая (рассеянное освещение)
+    // Диффузное освещение (diffuse)
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * baseColor * lightColor * lightIntensity;
+    vec3 diffuse;
+    if (material.useTexture == 1) {
+        diffuse = diff * material.diffuse * texture(material.diffuseMap, TexCoord).rgb;
+    } else {
+        diffuse = diff * material.diffuse;
+    }
 
-    // Specular составляющая (блики)
-    vec3 reflectDir = reflect(-lightDir, norm);
+    // Зеркальное освещение (specular)
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-    vec3 specular = spec * material.specular * lightColor * lightIntensity;
+    vec3 specular = spec * material.specular;
 
-    // Расчет затухания (attenuation) с расстоянием
-    float distance = length(lightPos - FragPos);
-    float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * (distance * distance));
+    // Рассчитываем коэффициент тени
+    float shadow = ShadowCalculation(FragPosLightSpace);
 
-    // Применяем затухание ко всем компонентам, кроме ambient
-    diffuse *= attenuation;
-    specular *= attenuation;
+    // Итоговый цвет с учетом теней
+    vec3 result = ambient + (1.0 - shadow) * (diffuse + specular) * lightColor * lightIntensity;
 
-    // Итоговый цвет фрагмента
-    vec3 result = ambient + diffuse + specular;
     FragColor = vec4(result, 1.0);
 }
