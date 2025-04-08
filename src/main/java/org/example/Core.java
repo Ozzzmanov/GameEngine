@@ -6,6 +6,9 @@ import org.example.GUI.GUI;
 import org.example.Render.Shadow.IShadowMap;
 import org.example.Render.Shadow.ShadowMap;
 import org.example.Render.Shadow.ShadowRenderer;
+import org.example.Scene.LoadScene;
+import org.example.Scene.SaveScene;
+import org.example.Scene.Scene;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFWErrorCallback;
@@ -47,10 +50,13 @@ public class Core {
     private GUI gui;
     private IShadowMap shadowMap;
 
+    private Scene scene;
+
     private void run() {
         init();
         loop();
 
+        //FIXME: Очистка должна быть отдельно
         for (Mesh mesh : meshes) {
             mesh.cleanup();
         }
@@ -140,6 +146,7 @@ public class Core {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+        //FIXME: Загружка шейдеров должна быть отдельно
         try {
             // Загружаем шейдеры
             mainShaderProgram = ShaderLoader.loadShader(
@@ -170,6 +177,11 @@ public class Core {
         camera = new Camera(new Vector3f(3.0f, 3.0f, 3.0f), new Vector3f(0.0f, 1.0f, 0.0f), -135.0f, -30.0f);
         inputManager = new InputManager(window, camera);
 
+
+
+
+        //FIXME: Загрузка моделей должна быть отдельно
+
         // Загрузка моделей и настройка материалов
         Mesh gold = ObjectLoader.loadObjModel("/Object/Models/gold.obj");
         gold.setShaderMaterial(ShaderMaterial.createGold());
@@ -185,33 +197,9 @@ public class Core {
 
         Mesh sun = ObjectLoader.loadObjModel("/Object/Primitives/sphere.obj");
 
-        node = new Node("rootNode");
-            Node meshNode = new Node("meshNode");
-                Node cubeNode = new Node("cubeNode");
-                    cubeNode.addMesh(cubes);
-                    cubeNode.setPosition(2,0,-5);
-                Node goldNode = new Node("goldNode");
-                    goldNode.addMesh(gold);
-                    goldNode.setPosition(4,0,4);
-                Node sphereNode = new Node("sphereNode");
-                    sphereNode.addMesh(sphereMesh);
-                    sphereNode.setPosition(-3,0,4);
-                Node barrelNode = new Node("barrelNode");
-                    barrelNode.addMesh(barrel);
-                    barrelNode.setPosition(-2,0,-2);
-            Node lightNode = new Node("lightNode");
-                lightNode.addMesh(sun);
-                lightNode.setPosition(5,5,5);
-                lightNode.setNodeType(Node.NodeType.LIGHT);
-
-        node.addChild(meshNode);
-            meshNode.addChild(cubeNode);
-            meshNode.addChild(goldNode);
-            meshNode.addChild(barrelNode);
-            meshNode.addChild(sphereNode);
-        node.addChild(lightNode);
-
-
+        scene = new Scene("default", LoadScene.loadScene("Scene/test.json"));
+//        scene = new Scene("default", node = new Node("empty"));
+        node = scene.getRootNode();
 
         grid = new Grid();
         editor = new Editor(inputManager, viewport, camera, node);
@@ -228,7 +216,7 @@ public class Core {
         glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
 
         ShadowRenderer shadowRenderer = new ShadowRenderer(shadowMap, shadowShaderProgram);
-
+        //FIXME: Оптимизировать
         while (!glfwWindowShouldClose(window)) {
             // Оновлюємо контролер вводу
             inputManager.update();

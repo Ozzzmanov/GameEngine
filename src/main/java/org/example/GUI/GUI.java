@@ -8,6 +8,7 @@ import imgui.glfw.ImGuiImplGlfw;
 import org.example.Editor.Editor;
 import org.example.Editor.TransformTool;
 import org.example.Node;
+import org.example.Scene.Scene;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -63,13 +64,13 @@ public class GUI {
     private NodeTreePanel nodeTreePanel;
     private NodePropertiesPanel nodePropertiesPanel;
 
-    public GUI(long window, Editor editor, Node rootNode, TransformTool transformTool) {
+    public GUI(long window, Editor editor, Node node, TransformTool transformTool) {
         this.window = window;
         this.editor = editor;
         this.transformTool = transformTool;
 
         initImGui();
-        initPanels(rootNode);
+        initPanels(node);
     }
 
     private void initImGui() {

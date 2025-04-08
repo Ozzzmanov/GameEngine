@@ -173,7 +173,7 @@ public class ObjectLoader {
             }
 
             reader.close();
-            return new Mesh(verticesArray, indicesArray);
+            return new Mesh(verticesArray, indicesArray, resourcePath);
 
         } catch (IOException e) {
             System.err.println("Ошибка при загрузке модели: " + e.getMessage());

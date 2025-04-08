@@ -3,6 +3,10 @@ package org.example.GUI;
 import imgui.ImGui;
 import imgui.flag.ImGuiWindowFlags;
 import org.example.Editor.Editor;
+import org.example.Node;
+import org.example.Scene.LoadScene;
+import org.example.Scene.SaveScene;
+import org.example.Scene.Scene;
 
 /**
  * Панель верхнього меню `TopBarPanel`, що реалізує функціонал для доступу до основних команд редактора.
@@ -31,6 +35,7 @@ public class TopBarPanel extends AbstractPanel {
     private final float buttonHeight;
     private final float buttonWidth;
     private final Editor editor;
+    private Scene scene;
 
     public TopBarPanel(float posX, float posY, float width, float height, Editor editor) {
         super("TopBar", posX, posY, width, height);
@@ -39,6 +44,7 @@ public class TopBarPanel extends AbstractPanel {
         this.editor = editor;
         this.windowFlags = ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize |
                 ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoTitleBar;
+//        this.scene = scene;
     }
 
     @Override
@@ -51,15 +57,18 @@ public class TopBarPanel extends AbstractPanel {
 
         if (ImGui.beginPopup("MenuPopup")) {
             if (ImGui.menuItem("New Scene")) {
-                // Логіка створення нової сцени
+
+                System.out.println("Нова сцена");
             }
 
             if (ImGui.menuItem("Save Scene")) {
-                // Логіка збереження сцени
+
+                System.out.println("Збереження сцени");
             }
 
             if (ImGui.menuItem("Load Scene")) {
-                // Логіка завантаження сцени
+
+                System.out.println("Загрузка сцени");
             }
 
             ImGui.separator();
@@ -97,4 +106,5 @@ public class TopBarPanel extends AbstractPanel {
             ImGui.endPopup();
         }
     }
+
 }

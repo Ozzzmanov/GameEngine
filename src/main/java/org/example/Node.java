@@ -397,4 +397,6 @@ public class Node {
     public void setNodeType(NodeType nodeType) {
         this.nodeType = nodeType;
     }
+
+
 }

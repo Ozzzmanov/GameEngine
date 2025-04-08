@@ -553,4 +553,6 @@ public class Editor implements NodeListener {
         glDeleteTextures(pickingTexture);
         glDeleteRenderbuffers(pickingDepthRBO);
     }
+
+
 }

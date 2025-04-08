@@ -22,16 +22,18 @@ public class Mesh {
     private final int[] indices;
     private Matrix4f modelMatrix;
     private final Vector3f position;
+    private String resourcePath;
 
     private RenderStrategy renderStrategy;
 
     private float rotationSpeed = 90.0f;
 
-    public Mesh(float[] vertices, int[] indices) {
+    public Mesh(float[] vertices, int[] indices, String resourcePath) {
         this.vertices = vertices;
         this.indices = indices;
         this.vertexCount = indices.length;
         this.position = new Vector3f(0.0f, 0.0f, 0.0f);
+        this.resourcePath = resourcePath;
 
         vaoID = glGenVertexArrays();
         glBindVertexArray(vaoID);
@@ -164,5 +166,9 @@ public class Mesh {
 
     public int getVertexCount() {
         return vertexCount;
+    }
+
+    public String getResourcePath() {
+        return resourcePath;
     }
 }
