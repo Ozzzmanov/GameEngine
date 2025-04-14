@@ -20,3 +20,4 @@ Project GameEngine is a 3D object editor based on OpenGL 3.3 and the LWJGL 3.3.1
 - Texture mapping support for applying image-based textures to 3D objects.  
 - Shadows rendering for enhanced depth and realism.  
 - Advanced lighting system, including specular highlights and reflections.  
+![Screenshot](https://github.com/Ozzzmanov/GameEngine/blob/master/1.png)
